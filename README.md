@@ -20,7 +20,14 @@ A demonstration project showing how to maximize code reuse between native (Strid
 │   │   ├── Player.cs          # Player entity with health and position
 │   │   ├── Physics.cs         # Platform-independent physics calculations
 │   │   ├── AI.cs              # AI decision making and behaviors
-│   │   └── Vector2D.cs        # 2D vector math
+│   │   ├── Vector2D.cs        # 2D vector math
+│   │   └── Testing/           # 🧪 Unified test framework
+│   │       ├── ITestBridge.cs       # Test control interface
+│   │       ├── TestSnapshot.cs      # Game state capture
+│   │       ├── TestCommand.cs       # Platform-agnostic commands
+│   │       ├── TestSpec.cs          # Test specification format
+│   │       ├── TestSpecExecutor.cs  # Test executor
+│   │       └── InMemoryTestBridge.cs # Reference implementation
 │   ├── Server/                # 🌐 Realtime game server (SignalR)
 │   │   ├── Hubs/GameHub.cs   # SignalR hub for client-server communication
 │   │   └── Program.cs         # ASP.NET Core server configuration
@@ -38,8 +45,16 @@ A demonstration project showing how to maximize code reuse between native (Strid
     │   └── Vector2DTests.cs
     ├── Integration/           # Platform integration tests
     │   └── GameIntegrationTests.cs
-    └── ServerTests/           # 🧪 Server integration tests
-        └── GameHubTests.cs    # SignalR hub tests
+    ├── ServerTests/           # 🧪 Server integration tests
+    │   └── GameHubTests.cs    # SignalR hub tests
+    ├── TestFrameworkTests/    # ⚙️ Unified test framework validation
+    │   └── TestFrameworkTests.cs
+    ├── TestRunner/            # 🎯 Test spec runner (console app)
+    │   └── Program.cs
+    └── TestSpecs/             # 📋 Platform-agnostic test specifications
+        ├── README.md          # Test spec documentation
+        ├── player-movement.json
+        └── player-damage.json
 ```
 
 ## 🏗️ Architecture
@@ -158,6 +173,49 @@ Located in `tests/ServerTests/`, these test the SignalR server and client-server
   - Health management
   - AI updates
   - Multiple simultaneous clients
+
+### Unified Test Framework (NEW)
+
+The project now includes a **unified test framework** that allows writing platform-agnostic tests that can run on both browser (Blazor) and native (Stride) builds.
+
+**Components:**
+- **ITestBridge** - Common interface for test control across platforms
+- **TestSpec** - JSON-based test specification format
+- **TestSpecExecutor** - Executes test specs against any ITestBridge implementation
+- **InMemoryTestBridge** - Reference implementation for testing
+- **TestRunner** - Console application to run test specs
+
+**Example Test Spec** (`tests/TestSpecs/player-movement.json`):
+```json
+{
+  "id": "player-movement-test",
+  "name": "Player Movement Test",
+  "description": "Verifies that player movement updates position correctly",
+  "setup": {
+    "players": [{"id": "player1", "name": "Test Player", "x": 0, "y": 0, "health": 100}]
+  },
+  "steps": [
+    {
+      "advanceSteps": 1,
+      "command": {"type": "Move", "targetId": "player1", "parameters": {"deltaX": 10, "deltaY": 5}},
+      "assertions": [
+        {"type": "PlayerPositionX", "targetId": "player1", "expected": 10.0}
+      ]
+    }
+  ]
+}
+```
+
+**Running Unified Tests:**
+```bash
+# Run test specs with the test runner
+dotnet run --project tests/TestRunner/Game.TestRunner.csproj
+
+# Run test framework validation tests
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj
+```
+
+See `tests/TestSpecs/README.md` for detailed documentation on the test specification format.
 
 Run tests with:
 ```bash
