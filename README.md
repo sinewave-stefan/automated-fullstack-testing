@@ -219,7 +219,7 @@ See `tests/TestSpecs/README.md` for detailed documentation on the test specifica
 
 Run tests with:
 ```bash
-# All tests (35 total)
+# All tests (45 total: 26 unit + 3 integration + 6 server + 7 framework + 3 specs)
 dotnet test
 
 # Specific test project
