@@ -1,0 +1,74 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build Core Library
+      run: dotnet build Game/Core/Game.Core.csproj --configuration Release --no-restore
+    
+    - name: Build All Projects
+      run: dotnet build --configuration Release --no-restore
+    
+    - name: Run Unit Tests
+      run: dotnet test tests/UnitTests/Game.UnitTests.csproj --configuration Release --no-build --verbosity normal
+    
+    - name: Run Integration Tests
+      run: dotnet test tests/Integration/Game.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
+    
+    - name: Publish WebApp
+      run: dotnet publish Game/WebApp/Game.WebApp.csproj --configuration Release --output ./publish/web
+    
+    - name: Publish StrideApp
+      run: dotnet publish Game/StrideApp/Game.StrideApp.csproj --configuration Release --output ./publish/native
+    
+    - name: Upload WebApp Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: webapp
+        path: ./publish/web
+    
+    - name: Upload StrideApp Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: strideapp
+        path: ./publish/native
+
+  deploy-webapp:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Download WebApp Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: webapp
+        path: ./webapp
+    
+    - name: Deploy to GitHub Pages (or other hosting)
+      run: |
+        echo "WebApp is ready for deployment"
+        echo "In production, this would deploy to:"
+        echo "  - GitHub Pages"
+        echo "  - Azure Static Web Apps"
+        echo "  - Netlify"
+        echo "  - Vercel"
+        echo "  - etc."
