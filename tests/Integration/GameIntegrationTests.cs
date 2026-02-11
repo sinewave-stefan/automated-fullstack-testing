@@ -38,7 +38,7 @@ public class GameIntegrationTests
         
         // AI behavior might change as player health changes
         // (this is just demonstrating the logic is shared)
-        Assert.NotNull(newAiDecision);
+        Assert.True(Enum.IsDefined(typeof(AIDecision), newAiDecision));
     }
 
     [Fact]
