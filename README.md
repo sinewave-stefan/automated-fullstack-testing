@@ -21,19 +21,25 @@ A demonstration project showing how to maximize code reuse between native (Strid
 │   │   ├── Physics.cs         # Platform-independent physics calculations
 │   │   ├── AI.cs              # AI decision making and behaviors
 │   │   └── Vector2D.cs        # 2D vector math
-│   ├── StrideApp/             # Native desktop rendering (Stride engine)
-│   │   └── Program.cs         # References Core library
-│   └── WebApp/                # Web rendering (Blazor WASM + WebGL)
-│       ├── Pages/Game.razor   # Interactive game demo using Core library
-│       └── Program.cs         # References Core library
+│   ├── Server/                # 🌐 Realtime game server (SignalR)
+│   │   ├── Hubs/GameHub.cs   # SignalR hub for client-server communication
+│   │   └── Program.cs         # ASP.NET Core server configuration
+│   ├── StrideApp/             # 🎮 Native desktop client (Stride engine)
+│   │   └── Program.cs         # Console multiplayer client
+│   └── WebApp/                # 🌍 Web client (Blazor WASM)
+│       ├── Pages/Game.razor   # Single-player game demo
+│       ├── Pages/Multiplayer.razor # Multiplayer client
+│       └── Program.cs         # Blazor configuration
 └── tests/
     ├── UnitTests/             # Unit tests for Core library
     │   ├── PlayerTests.cs
     │   ├── PhysicsTests.cs
     │   ├── AITests.cs
     │   └── Vector2DTests.cs
-    └── Integration/           # Platform integration tests
-        └── GameIntegrationTests.cs
+    ├── Integration/           # Platform integration tests
+    │   └── GameIntegrationTests.cs
+    └── ServerTests/           # 🧪 Server integration tests
+        └── GameHubTests.cs    # SignalR hub tests
 ```
 
 ## 🏗️ Architecture
@@ -51,7 +57,32 @@ A demonstration project showing how to maximize code reuse between native (Strid
 ✅ **Core library** = Single source of truth for all game logic  
 ✅ **Only rendering code** is duplicated between platforms  
 ✅ **All tests** run on the same shared logic  
-✅ **Deterministic** behavior across native and web builds
+✅ **Deterministic** behavior across native and web builds  
+✅ **Realtime server** enables multiplayer across web and native clients
+
+### Client-Server Architecture
+
+```
+┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
+│  Web Client     │         │  Game Server     │         │ Native Client   │
+│  (Blazor WASM)  │◄────────┤  (SignalR Hub)   ├────────►│ (Console/Stride)│
+│                 │  WebSocket  Uses Core     │  WebSocket │                 │
+│  Uses Core ✅   │         │  Library ✅      │         │  Uses Core ✅   │
+└─────────────────┘         └──────────────────┘         └─────────────────┘
+```
+
+**Server Features:**
+- SignalR hub for realtime bidirectional communication
+- Manages game state using shared Core library
+- Broadcasts updates to all connected clients
+- Supports multiple simultaneous players
+- Server-side AI using same Core.AI logic
+
+**Client Features:**
+- Both web and native clients use identical Core library
+- Real-time synchronization of player positions and health
+- Shared AI behavior visible to all clients
+- Platform-specific rendering only
 
 ## 🚀 Getting Started
 
@@ -74,17 +105,28 @@ dotnet test
 
 ### Run the Applications
 
-#### Native App (Console Placeholder)
+#### 🌐 Multiplayer Server (Required for multiplayer)
+```bash
+dotnet run --project Game/Server/Game.Server.csproj --urls "http://localhost:5200"
+```
+
+The server runs on `http://localhost:5200` and provides the `/gamehub` SignalR endpoint.
+
+#### 🎮 Native Client (Console Multiplayer)
 ```bash
 dotnet run --project Game/StrideApp/Game.StrideApp.csproj
 ```
 
-#### Web App (Blazor WASM)
+Use WASD to move, H for damage, J for heal, U to update AI, Q to quit.
+
+#### 🌍 Web App (Blazor WASM)
 ```bash
 dotnet run --project Game/WebApp/Game.WebApp.csproj
 ```
 
-Then navigate to `https://localhost:5001/game` to see the interactive game demo.
+Then navigate to:
+- `http://localhost:5000/game` - Single-player demo (local only)
+- `http://localhost:5000/multiplayer` - Multiplayer client (connects to server)
 
 ## 🧪 Testing
 
@@ -92,10 +134,10 @@ The project includes comprehensive tests demonstrating code sharing:
 
 ### Unit Tests
 Located in `tests/UnitTests/`, these test the Core library in isolation:
-- `PlayerTests.cs` - Player entity behavior
-- `PhysicsTests.cs` - Physics calculations
-- `AITests.cs` - AI decision making
-- `Vector2DTests.cs` - Vector math operations
+- `PlayerTests.cs` - Player entity behavior (8 tests)
+- `PhysicsTests.cs` - Physics calculations (5 tests)
+- `AITests.cs` - AI decision making (7 tests)
+- `Vector2DTests.cs` - Vector math operations (6 tests)
 
 ### Integration Tests
 Located in `tests/Integration/`, these demonstrate how the same core logic works across platforms:
@@ -103,13 +145,23 @@ Located in `tests/Integration/`, these demonstrate how the same core logic works
 - Multi-step physics simulations
 - Cross-platform collision detection
 
+### Server Tests
+Located in `tests/ServerTests/`, these test the SignalR server and client-server communication:
+- `GameHubTests.cs` - SignalR hub integration tests (6 tests)
+  - Player connection and creation
+  - Movement synchronization
+  - Health management
+  - AI updates
+  - Multiple simultaneous clients
+
 Run tests with:
 ```bash
-# All tests
+# All tests (35 total)
 dotnet test
 
 # Specific test project
 dotnet test tests/UnitTests/Game.UnitTests.csproj
+dotnet test tests/ServerTests/Game.ServerTests.csproj
 ```
 
 ## 📊 CI/CD Pipeline
