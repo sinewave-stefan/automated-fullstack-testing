@@ -1,0 +1,25 @@
+<Solution>
+  <Folder Name="/Game/" />
+  <Folder Name="/Game/Core/">
+    <Project Path="Game/Core/Game.Core.csproj" />
+  </Folder>
+  <Folder Name="/Game/Server/">
+    <Project Path="Game/Server/Game.Server.csproj" />
+  </Folder>
+  <Folder Name="/Game/StrideApp/">
+    <Project Path="Game/StrideApp/Game.StrideApp.csproj" />
+  </Folder>
+  <Folder Name="/Game/WebApp/">
+    <Project Path="Game/WebApp/Game.WebApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Integration/">
+    <Project Path="tests/Integration/Game.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/ServerTests/">
+    <Project Path="tests/ServerTests/Game.ServerTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/UnitTests/">
+    <Project Path="tests/UnitTests/Game.UnitTests.csproj" />
+  </Folder>
+</Solution>
