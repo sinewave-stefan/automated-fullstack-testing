@@ -1,0 +1,86 @@
+{
+  "id": "player-damage-test",
+  "name": "Player Damage Test",
+  "description": "Verifies that damage reduces health and can kill players",
+  "setup": {
+    "players": [
+      {
+        "id": "player1",
+        "name": "Test Player",
+        "x": 0.0,
+        "y": 0.0,
+        "health": 100
+      }
+    ],
+    "aiEntities": []
+  },
+  "steps": [
+    {
+      "advanceSteps": 1,
+      "command": null,
+      "assertions": [
+        {
+          "type": "PlayerHealth",
+          "targetId": "player1",
+          "expected": 100
+        },
+        {
+          "type": "PlayerIsAlive",
+          "targetId": "player1"
+        }
+      ]
+    },
+    {
+      "advanceSteps": 0,
+      "command": {
+        "type": "Damage",
+        "targetId": "player1",
+        "parameters": {
+          "amount": 30
+        }
+      },
+      "assertions": []
+    },
+    {
+      "advanceSteps": 1,
+      "command": null,
+      "assertions": [
+        {
+          "type": "PlayerHealth",
+          "targetId": "player1",
+          "expected": 70
+        },
+        {
+          "type": "PlayerIsAlive",
+          "targetId": "player1"
+        }
+      ]
+    },
+    {
+      "advanceSteps": 0,
+      "command": {
+        "type": "Damage",
+        "targetId": "player1",
+        "parameters": {
+          "amount": 80
+        }
+      },
+      "assertions": []
+    },
+    {
+      "advanceSteps": 1,
+      "command": null,
+      "assertions": [
+        {
+          "type": "PlayerHealth",
+          "targetId": "player1",
+          "expected": 0
+        },
+        {
+          "type": "PlayerIsDead",
+          "targetId": "player1"
+        }
+      ]
+    }
+  ]
+}

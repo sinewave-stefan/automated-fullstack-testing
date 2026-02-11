@@ -1,0 +1,76 @@
+{
+  "id": "player-movement-test",
+  "name": "Player Movement Test",
+  "description": "Verifies that player movement updates position correctly",
+  "setup": {
+    "players": [
+      {
+        "id": "player1",
+        "name": "Test Player",
+        "x": 0.0,
+        "y": 0.0,
+        "health": 100
+      }
+    ],
+    "aiEntities": []
+  },
+  "steps": [
+    {
+      "advanceSteps": 1,
+      "command": null,
+      "assertions": [
+        {
+          "type": "PlayerPositionX",
+          "targetId": "player1",
+          "expected": 0.0,
+          "tolerance": 0.01
+        },
+        {
+          "type": "PlayerPositionY",
+          "targetId": "player1",
+          "expected": 0.0,
+          "tolerance": 0.01
+        }
+      ]
+    },
+    {
+      "advanceSteps": 0,
+      "command": {
+        "type": "Move",
+        "targetId": "player1",
+        "parameters": {
+          "deltaX": 10.0,
+          "deltaY": 5.0
+        }
+      },
+      "assertions": []
+    },
+    {
+      "advanceSteps": 1,
+      "command": null,
+      "assertions": [
+        {
+          "type": "PlayerPositionX",
+          "targetId": "player1",
+          "expected": 10.0,
+          "tolerance": 0.01
+        },
+        {
+          "type": "PlayerPositionY",
+          "targetId": "player1",
+          "expected": 5.0,
+          "tolerance": 0.01
+        },
+        {
+          "type": "PlayerHealth",
+          "targetId": "player1",
+          "expected": 100
+        },
+        {
+          "type": "PlayerIsAlive",
+          "targetId": "player1"
+        }
+      ]
+    }
+  ]
+}
