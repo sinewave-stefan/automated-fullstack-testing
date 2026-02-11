@@ -24,8 +24,8 @@ A demonstration project showing how to maximize code reuse between native (Strid
 │   ├── Server/                # 🌐 Realtime game server (SignalR)
 │   │   ├── Hubs/GameHub.cs   # SignalR hub for client-server communication
 │   │   └── Program.cs         # ASP.NET Core server configuration
-│   ├── StrideApp/             # 🎮 Native desktop client (Stride engine)
-│   │   └── Program.cs         # Console multiplayer client
+│   ├── StrideApp/             # 🎮 Native desktop client (Stride 3D engine)
+│   │   └── Program.cs         # Full Stride game with 3D rendering
 │   └── WebApp/                # 🌍 Web client (Blazor WASM)
 │       ├── Pages/Game.razor   # Single-player game demo
 │       ├── Pages/Multiplayer.razor # Multiplayer client
@@ -112,12 +112,17 @@ dotnet run --project Game/Server/Game.Server.csproj --urls "http://localhost:520
 
 The server runs on `http://localhost:5200` and provides the `/gamehub` SignalR endpoint.
 
-#### 🎮 Native Client (Console Multiplayer)
+#### 🎮 Native Client (Stride 3D Engine)
 ```bash
-dotnet run --project Game/StrideApp/Game.StrideApp.csproj
+dotnet run --project Game/StrideApp/Game.StrideApp.csproj --configuration Release
 ```
 
-Use WASD to move, H for damage, J for heal, U to update AI, Q to quit.
+**Features:**
+- Full 3D rendering using Stride game engine
+- Real-time multiplayer with 3D visualization of all players
+- Interactive controls: WASD (move), H (damage), J (heal), U (update AI), ESC (quit)
+- Blue cube = Your player, Green cubes = Other players, Red cube = Server AI
+- Connects to multiplayer server for synchronized gameplay
 
 #### 🌍 Web App (Blazor WASM)
 ```bash
