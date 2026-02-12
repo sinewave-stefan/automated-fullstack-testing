@@ -310,7 +310,7 @@ public class PlayerAssertions
 
         if (diffX > tolerance || diffY > tolerance)
         {
-            throw new AssertionException(
+            throw new InvalidOperationException(
                 $"Expected position ({x}, {y}) but was ({_snapshot.X}, {_snapshot.Y})");
         }
 
@@ -324,7 +324,7 @@ public class PlayerAssertions
     {
         if (_snapshot.Health != health)
         {
-            throw new AssertionException(
+            throw new InvalidOperationException(
                 $"Expected health {health} but was {_snapshot.Health}");
         }
 
@@ -338,7 +338,7 @@ public class PlayerAssertions
     {
         if (!_snapshot.IsAlive)
         {
-            throw new AssertionException("Expected player to be alive but was dead");
+            throw new InvalidOperationException("Expected player to be alive but was dead");
         }
 
         return this;
@@ -351,19 +351,9 @@ public class PlayerAssertions
     {
         if (_snapshot.IsAlive)
         {
-            throw new AssertionException("Expected player to be dead but was alive");
+            throw new InvalidOperationException("Expected player to be dead but was alive");
         }
 
         return this;
-    }
-}
-
-/// <summary>
-/// Exception thrown when a scenario assertion fails.
-/// </summary>
-public class AssertionException : Exception
-{
-    public AssertionException(string message) : base(message)
-    {
     }
 }
