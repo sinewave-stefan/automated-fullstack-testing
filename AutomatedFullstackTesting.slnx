@@ -15,7 +15,6 @@
   <Folder Name="/tests/" />
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/Game.IntegrationTests.csproj" />
-    <Project Path="tests/StrideAppTests/Game.StrideApp.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/ServerTests/">
     <Project Path="tests/ServerTests/Game.ServerTests.csproj" />
