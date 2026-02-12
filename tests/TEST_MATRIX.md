@@ -72,32 +72,32 @@ public static IEnumerable<object[]> TestBridges()
 
 ### Integration Tests
 
-**Stride Integration Tests** (`tests/TestFrameworkTests/StrideIntegrationTests.cs`):
-- ⚠️ Currently require full Stride game initialization with `GameContext`
-- Full initialization requires creating a `GameContext` which needs platform-specific windowing code
-- These tests demonstrate the intended integration but need special setup to run
-- Test player movement, damage, rendering initialization
+**Unified Integration Tests** (`tests/TestFrameworkTests/IntegrationTests.cs`):
+- ✅ **Matrix-based test suite** that runs the same tests against both Stride and Web platforms
+- Uses `[Theory]` with `[MemberData]` to run each test against multiple bridges
+- Tests player movement, damage, and rendering initialization across platforms
+- Automatically handles platform-specific setup (GameContext for Stride, Playwright for Web)
 
-### What's Needed to Make Stride Tests Run
+**Test Matrix:**
+- ✅ **Stride**: Real Stride game engine instances with full initialization
+- ✅ **Web**: Real Blazor WebAssembly instances with Playwright automation
 
-**See `STRIDE_INTEGRATION_SETUP.md` for detailed implementation guide.**
-
-Quick summary:
-1. **Create a GameContext**: Stride's `Game.Initialize()` requires a `GameContext` parameter
-2. **Platform-Specific**: Use `GameContextWindows` (Windows) or appropriate context for your platform
-3. **Use `CreateFullyInitializedInstance()`**: New method in `StrideTestBridge` that accepts a `GameContext`
-4. **Current Status**: Tests use minimal initialization (`InitializeForTesting()`) which works for logic but not rendering
-
-**Example**:
-```csharp
-var gameContext = new GameContextWindows(null, 800, 600, "Test");
-var bridge = StrideTestBridge.CreateFullyInitializedInstance(gameContext);
+**Running Integration Tests:**
+```powershell
+# Run all integration tests (runs against both Stride and Web)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests"
 ```
 
-**Blazor Integration Tests** (`tests/TestFrameworkTests/WebIntegrationTests.cs`):
-- ✅ Now enabled with Playwright + Blazor test server
-- Automatically launches Blazor dev server and runs tests against real browser instances
-- Uses Playwright to control Chromium browser and interact with Blazor WebAssembly app
+
+**Stride Integration Details:**
+- Requires full Stride game initialization with `GameContext`
+- See `STRIDE_INTEGRATION_SETUP.md` for detailed implementation guide
+- On Windows, automatically creates `GameContextWindows` for full initialization
+- Falls back to minimal initialization if GameContext creation fails
+
+**Web Integration Details:**
+- Automatically launches Blazor dev server using `BlazorTestServer`
+- Uses Playwright to control Chromium browser
 - Tests verify fluent API works with actual browser runtime
 
 ## Running Specific Bridge Types
@@ -119,11 +119,11 @@ dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "Fu
 dotnet test tests/StrideAppTests/Game.StrideApp.Tests.csproj --filter "FullyQualifiedName~CrossPlatformTests"
 ```
 
-### Blazor Tests (When Configured)
+### Integration Tests (Stride + Web Matrix)
 
 ```powershell
-# Run Blazor integration tests (requires running app)
-dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~WebIntegrationTests"
+# Run unified integration tests (runs against both Stride and Web)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests"
 ```
 
 ## Test Output
@@ -137,6 +137,16 @@ CameraCreation_ShouldWork_OnAllPlatforms [InMemoryTestBridge] ✓
 CameraCreation_ShouldWork_OnAllPlatforms [StrideTestBridge] ✓
 ```
 
+When running integration tests, you'll see output like:
+
+```
+PlayerMovement_UpdatesPosition [Stride] ✓
+PlayerMovement_UpdatesPosition [Web] ✓
+PlayerDamage_ReducesHealth [Stride] ✓
+PlayerDamage_ReducesHealth [Web] ✓
+RenderingInitialization_Works [Stride] ✓
+```
+
 Each test runs once per bridge type, ensuring the same behavior across platforms.
 
 ## CI/CD Test Matrix
@@ -146,11 +156,13 @@ The CI/CD pipeline runs:
 1. **Unit Tests** - Fast InMemory tests
 2. **Framework Tests** - InMemory + Stride integration
 3. **Cross-Platform Tests** - InMemory + Stride
-4. **Integration Tests** - Various bridge types
+4. **Integration Tests** - Unified matrix (Stride + Web)
 
 See `.github/workflows/ci.yml` for the complete test matrix execution.
 
 ## Adding New Bridges to the Matrix
+
+### Cross-Platform Tests
 
 To add a new bridge to the cross-platform test matrix, update `TestBridges()` in `tests/StrideAppTests/RenderingInitializationTests.cs`:
 
@@ -160,6 +172,34 @@ public static IEnumerable<object[]> TestBridges()
     yield return new object[] { new InMemoryTestBridge() };
     yield return new object[] { StrideTestBridge.CreateTestInstance() };
     yield return new object[] { new WebTestBridge(page, appUrl) }; // When ready
+}
+```
+
+### Integration Tests
+
+To add a new bridge to the integration test matrix, update `TestBridges()` in `tests/TestFrameworkTests/IntegrationTests.cs`:
+
+```csharp
+public static IEnumerable<object[]> TestBridges()
+{
+    yield return new object[] { "Stride" };
+    yield return new object[] { "Web" };
+    yield return new object[] { "YourNewPlatform" }; // Add your platform here
+}
+```
+
+Then update `CreateBridge()` to handle the new platform:
+
+```csharp
+private ITestBridge CreateBridge(string platform)
+{
+    return platform switch
+    {
+        "Stride" => StrideTestBridge.CreateTestInstance(),
+        "Web" => CreateWebBridge(),
+        "YourNewPlatform" => YourNewTestBridge.CreateInstance(),
+        _ => throw new NotSupportedException($"Platform {platform} is not supported")
+    };
 }
 ```
 
