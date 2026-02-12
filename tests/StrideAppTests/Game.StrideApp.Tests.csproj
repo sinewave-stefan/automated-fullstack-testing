@@ -23,8 +23,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Only reference Core - tests are platform-agnostic! -->
+    <!-- Reference Core and StrideApp for integration tests -->
     <ProjectReference Include="..\..\Game\Core\Game.Core.csproj" />
+    <ProjectReference Include="..\..\Game\StrideApp\Game.StrideApp.csproj" />
   </ItemGroup>
 
 </Project>

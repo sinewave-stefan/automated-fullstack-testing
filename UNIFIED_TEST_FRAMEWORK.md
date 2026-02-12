@@ -47,13 +47,7 @@ This implementation provides a unified test framework that allows writing platfo
 
 ### Infrastructure
 
-1. **TestRunner** (Console Application)
-   - Loads test specs from JSON files
-   - Executes specs using InMemoryTestBridge
-   - Provides pass/fail reporting
-   - Returns appropriate exit codes for CI
-
-2. **TestFrameworkTests** (xUnit Test Project)
+1. **TestFrameworkTests** (xUnit Test Project)
    - Comprehensive tests validating the framework
    - Tests using fluent API (`ScenarioApiTests.cs`)
    - Tests command execution and infrastructure (`TestFrameworkTests.cs`)

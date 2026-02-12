@@ -18,6 +18,11 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
+    - name: Install Playwright
+      run: |
+        dotnet tool install --global Microsoft.Playwright.CLI
+        playwright install --with-deps chromium
+    
     - name: Restore dependencies
       run: dotnet restore
     
@@ -35,6 +40,14 @@ jobs:
     
     - name: Run Test Framework Tests
       run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal
+    
+    - name: Run Stride Integration Tests
+      run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal --filter "FullyQualifiedName~StrideIntegrationTests"
+      continue-on-error: true  # Allow to fail if Stride setup issues
+    
+    - name: Run Cross-Platform Tests
+      run: dotnet test tests/StrideAppTests/Game.StrideApp.Tests.csproj --configuration Release --no-build --verbosity normal
+      continue-on-error: true  # Allow to fail if Stride setup issues
     
     - name: Publish WebApp
       run: dotnet publish Game/WebApp/Game.WebApp.csproj --configuration Release --output ./publish/web

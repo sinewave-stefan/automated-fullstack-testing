@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Game.Core.Testing;
+using Game.StrideApp.Testing;
 using Xunit;
 
 namespace Game.StrideApp.Tests;
@@ -134,13 +135,21 @@ public class RenderingInitializationTests
     /// Tests that can be parameterized to run on multiple bridges.
     /// This demonstrates dual-targeting capability.
     /// </summary>
-    public class CrossPlatformTests
+    public class CrossPlatformTests : IDisposable
     {
+        private readonly List<IDisposable> _disposables = new();
+
         public static IEnumerable<object[]> TestBridges()
         {
             yield return new object[] { new InMemoryTestBridge() };
-            // Future: yield return new object[] { new BrowserTestBridge() };
-            // Future: yield return new object[] { new StrideTestBridge(game) };
+            
+            // Note: Stride tests require full game initialization with GameContext
+            // which is not available in unit test scenarios. Stride integration tests
+            // are available in StrideIntegrationTests.cs for full integration testing.
+            // For now, we only test with InMemory bridge in cross-platform tests.
+            
+            // Future: yield return new object[] { StrideTestBridge.CreateTestInstance() };
+            // Future: yield return new object[] { new WebTestBridge(page, appUrl) };
         }
 
         [Theory]
@@ -174,6 +183,15 @@ public class RenderingInitializationTests
             // Assert
             scenario.Assert.Entity(camera).Exists().IsOfType("Camera");
             scenario.Assert.Rendering().HasActiveCamera();
+        }
+        
+        public void Dispose()
+        {
+            // Clean up any disposable bridges
+            foreach (var disposable in _disposables)
+            {
+                disposable.Dispose();
+            }
         }
     }
 }

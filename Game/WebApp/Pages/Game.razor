@@ -1,5 +1,9 @@
 @page "/game"
 @using global::Game.Core
+@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
 
 <PageTitle>Game Demo</PageTitle>
 
@@ -50,11 +54,15 @@
 </div>
 
 @code {
+    private bool IsTestMode { get; set; }
+    
     private Player player = new Player("Web Player", 100);
     private AI ai = new AI(DateTime.Now.Millisecond);
     private AIDecision currentDecision = AIDecision.Seek;
     private Vector2D patrolPoint = new Vector2D(0, 0);
     private float distanceToPlayer = 0;
+    private DotNetObjectReference<Game>? _objRef;
+    private string currentPlayerId = "player-1"; // Track the current player ID for test bridge
 
     private void MoveUp() => player.Move(0, -1);
     private void MoveDown() => player.Move(0, 1);
@@ -88,7 +96,113 @@
 
     protected override void OnInitialized()
     {
+        // Read testMode query parameter from URL
+        var uri = new Uri(Navigation.Uri);
+        if (!string.IsNullOrEmpty(uri.Query))
+        {
+            var query = uri.Query.TrimStart('?');
+            var pairs = query.Split('&');
+            foreach (var pair in pairs)
+            {
+                var parts = pair.Split('=');
+                if (parts.Length == 2 && parts[0] == "testMode")
+                {
+                    IsTestMode = bool.TryParse(parts[1], out var testMode) && testMode;
+                    break;
+                }
+            }
+        }
+        
         GeneratePatrol();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && IsTestMode)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("testBridge.initialize", _objRef);
+        }
+    }
+
+    // Methods exposed to JavaScript for test bridge
+    [JSInvokable]
+    public void TestStep()
+    {
+        // Update AI decision based on current state
+        distanceToPlayer = Vector2D.Distance(patrolPoint, player.Position);
+        currentDecision = ai.MakeDecision(player.Health, player.MaxHealth, distanceToPlayer);
+    }
+
+    [JSInvokable]
+    public void TestMove(float deltaX, float deltaY)
+    {
+        player.Move(deltaX, deltaY);
+    }
+
+    [JSInvokable]
+    public void TestTakeDamage(int amount)
+    {
+        player.TakeDamage(amount);
+    }
+
+    [JSInvokable]
+    public void TestHeal(int amount)
+    {
+        if (player.IsAlive)
+        {
+            player.Heal(amount);
+        }
+    }
+
+    [JSInvokable]
+    public void TestSpawn(string playerId, string name, float x, float y, int health)
+    {
+        // Update the player with new spawn parameters
+        currentPlayerId = playerId;
+        player = new Player(name, health);
+        player.Move(x, y);
+    }
+
+    [JSInvokable]
+    public string TestGetSnapshot()
+    {
+        var snapshot = new
+        {
+            Frame = 0, // Could track frames if needed
+            Players = new[]
+            {
+                new
+                {
+                    Id = currentPlayerId,
+                    Name = player.Name,
+                    X = player.Position.X,
+                    Y = player.Position.Y,
+                    Health = player.Health,
+                    MaxHealth = player.MaxHealth,
+                    IsAlive = player.IsAlive
+                }
+            },
+            AIEntities = new[]
+            {
+                new
+                {
+                    Id = "ai-1",
+                    X = patrolPoint.X,
+                    Y = patrolPoint.Y,
+                    CurrentDecision = currentDecision.ToString()
+                }
+            }
+        };
+        return System.Text.Json.JsonSerializer.Serialize(snapshot);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_objRef != null)
+        {
+            _objRef.Dispose();
+        }
     }
 }
 

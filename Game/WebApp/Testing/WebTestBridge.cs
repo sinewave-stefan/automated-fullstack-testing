@@ -1,5 +1,7 @@
 using Game.Core;
 using Game.Core.Testing;
+using Microsoft.Playwright;
+using System.Text.Json;
 
 namespace Game.WebApp.Testing;
 
@@ -7,10 +9,15 @@ namespace Game.WebApp.Testing;
 /// Test bridge implementation for Blazor WebAssembly game client.
 /// Allows tests to control and inspect the web game through the platform-agnostic ITestBridge interface.
 /// </summary>
-public class WebTestBridge : ITestBridge
+public class WebTestBridge : ITestBridge, IDisposable
 {
-    private Player _player;
-    private AI _ai;
+    private readonly IPage? _page;
+    private readonly string? _appUrl;
+    private readonly bool _useBrowser;
+    
+    // Fallback in-memory state for when browser is not available
+    private Player? _player;
+    private AI? _ai;
     private int _currentFrame;
     private Vector2D _patrolPoint;
     private AIDecision _currentDecision;
@@ -20,8 +27,30 @@ public class WebTestBridge : ITestBridge
     private readonly List<EntitySnapshot> _entities = new();
     private string? _activeCameraId;
 
+    /// <summary>
+    /// Creates a WebTestBridge using browser automation (Playwright).
+    /// </summary>
+    public WebTestBridge(IPage page, string appUrl)
+    {
+        _page = page ?? throw new ArgumentNullException(nameof(page));
+        _appUrl = appUrl ?? throw new ArgumentNullException(nameof(appUrl));
+        _useBrowser = true;
+        
+        // Navigate to app and wait for Blazor to initialize
+        _page.GotoAsync(_appUrl, new PageGotoOptions
+        {
+            WaitUntil = WaitUntilState.NetworkIdle
+        }).Wait();
+        WaitForBlazorReady().Wait();
+    }
+
+    /// <summary>
+    /// Creates a WebTestBridge with in-memory state (fallback mode).
+    /// Use this when browser automation is not available.
+    /// </summary>
     public WebTestBridge()
     {
+        _useBrowser = false;
         _player = new Player("Test Player", 100);
         _ai = new AI(42); // Deterministic seed for testing
         _patrolPoint = new Vector2D(0, 0);
@@ -36,6 +65,7 @@ public class WebTestBridge : ITestBridge
     /// </summary>
     public WebTestBridge(Player player, AI ai)
     {
+        _useBrowser = false;
         _player = player ?? throw new ArgumentNullException(nameof(player));
         _ai = ai ?? throw new ArgumentNullException(nameof(ai));
         _patrolPoint = new Vector2D(0, 0);
@@ -43,15 +73,58 @@ public class WebTestBridge : ITestBridge
         _canvasWidth = 400;
         _canvasHeight = 300;
     }
+    
+    private async Task WaitForBlazorReady()
+    {
+        if (_page == null) return;
+        
+        // Wait for Blazor to be ready
+        await _page.WaitForFunctionAsync("window.Blazor !== undefined", new PageWaitForFunctionOptions
+        {
+            Timeout = 30000
+        });
+        
+        // Wait for Blazor WebAssembly to finish loading
+        await _page.WaitForFunctionAsync("window.Blazor !== undefined && typeof Blazor.start === 'function' || window.Blazor._internal !== undefined", new PageWaitForFunctionOptions
+        {
+            Timeout = 30000
+        });
+        
+        // Wait for the test bridge script to be loaded (it's already in index.html)
+        await _page.WaitForFunctionAsync("window.testBridge !== undefined", new PageWaitForFunctionOptions
+        {
+            Timeout = 30000
+        });
+        
+        // Wait for the test bridge to be initialized by the Blazor component
+        // The Game.razor component calls testBridge.initialize() in OnAfterRenderAsync when IsTestMode=true
+        await _page.WaitForFunctionAsync("window.testBridge !== undefined && window.testBridge._initialized === true", new PageWaitForFunctionOptions
+        {
+            Timeout = 30000
+        });
+        
+        // Give it a moment to ensure everything is fully initialized
+        await Task.Delay(500);
+    }
 
     public bool IsTestMode => true;
 
     public void Step()
     {
-        _currentFrame++;
-        // Update AI decision based on current state
-        float distanceToPlayer = Vector2D.Distance(_patrolPoint, _player.Position);
-        _currentDecision = _ai.MakeDecision(_player.Health, _player.MaxHealth, distanceToPlayer);
+        if (_useBrowser && _page != null)
+        {
+            _page.EvaluateAsync("window.testBridge.step()").Wait();
+            _currentFrame++;
+        }
+        else
+        {
+            _currentFrame++;
+            if (_player != null && _ai != null)
+            {
+                float distanceToPlayer = Vector2D.Distance(_patrolPoint, _player.Position);
+                _currentDecision = _ai.MakeDecision(_player.Health, _player.MaxHealth, distanceToPlayer);
+            }
+        }
     }
 
     public void Step(int count)
@@ -76,50 +149,62 @@ public class WebTestBridge : ITestBridge
 
     public TestSnapshot GetSnapshot()
     {
-        var snapshot = new TestSnapshot
+        if (_useBrowser && _page != null)
         {
-            Frame = _currentFrame,
-            Players = new List<PlayerSnapshot>
+            var json = _page.EvaluateAsync<string>("window.testBridge.getSnapshot()").Result;
+            var snapshot = JsonSerializer.Deserialize<TestSnapshot>(json, new JsonSerializerOptions
             {
-                new PlayerSnapshot
-                {
-                    Id = "player-1",
-                    Name = _player.Name,
-                    X = _player.Position.X,
-                    Y = _player.Position.Y,
-                    Health = _player.Health,
-                    MaxHealth = _player.MaxHealth,
-                    IsAlive = _player.IsAlive
-                }
-            },
-            AIEntities = new List<AISnapshot>
+                PropertyNameCaseInsensitive = true
+            });
+            return snapshot ?? new TestSnapshot { Frame = _currentFrame };
+        }
+        else
+        {
+            var snapshot = new TestSnapshot
             {
-                new AISnapshot
+                Frame = _currentFrame,
+                Players = _player != null ? new List<PlayerSnapshot>
                 {
-                    Id = "ai-1",
-                    X = _patrolPoint.X,
-                    Y = _patrolPoint.Y,
-                    CurrentDecision = _currentDecision.ToString()
-                }
-            },
-            Entities = new List<EntitySnapshot>(_entities),
-            Rendering = new RenderingSnapshot
-            {
-                IsInitialized = _isRenderingInitialized,
-                CameraSlotCount = _activeCameraId != null ? 1 : 0,
-                RenderStageCount = _isRenderingInitialized ? 1 : 0, // Canvas has single render pass
-                ActiveCameraId = _activeCameraId,
-                Width = _canvasWidth,
-                Height = _canvasHeight,
-                PlatformInfo = new Dictionary<string, object>
+                    new PlayerSnapshot
+                    {
+                        Id = "player-1",
+                        Name = _player.Name,
+                        X = _player.Position.X,
+                        Y = _player.Position.Y,
+                        Health = _player.Health,
+                        MaxHealth = _player.MaxHealth,
+                        IsAlive = _player.IsAlive
+                    }
+                } : new List<PlayerSnapshot>(),
+                AIEntities = new List<AISnapshot>
                 {
-                    ["platform"] = "Blazor WebAssembly",
-                    ["renderer"] = "SVG/Canvas"
+                    new AISnapshot
+                    {
+                        Id = "ai-1",
+                        X = _patrolPoint.X,
+                        Y = _patrolPoint.Y,
+                        CurrentDecision = _currentDecision.ToString()
+                    }
+                },
+                Entities = new List<EntitySnapshot>(_entities),
+                Rendering = new RenderingSnapshot
+                {
+                    IsInitialized = _isRenderingInitialized,
+                    CameraSlotCount = _activeCameraId != null ? 1 : 0,
+                    RenderStageCount = _isRenderingInitialized ? 1 : 0,
+                    ActiveCameraId = _activeCameraId,
+                    Width = _canvasWidth,
+                    Height = _canvasHeight,
+                    PlatformInfo = new Dictionary<string, object>
+                    {
+                        ["platform"] = "Blazor WebAssembly",
+                        ["renderer"] = "SVG/Canvas"
+                    }
                 }
-            }
-        };
+            };
 
-        return snapshot;
+            return snapshot;
+        }
     }
 
     public void ExecuteCommand(TestCommand command)
@@ -167,25 +252,52 @@ public class WebTestBridge : ITestBridge
     {
         var deltaX = ConvertToFloat(command.Parameters["deltaX"]);
         var deltaY = ConvertToFloat(command.Parameters["deltaY"]);
-        _player.Move(deltaX, deltaY);
+        
+        if (_useBrowser && _page != null)
+        {
+            _page.EvaluateAsync($"window.testBridge.executeCommand('Move', null, {{ deltaX: {deltaX}, deltaY: {deltaY} }})").Wait();
+        }
+        else if (_player != null)
+        {
+            _player.Move(deltaX, deltaY);
+        }
     }
 
     private void ExecuteDamageCommand(TestCommand command)
     {
         var amount = ConvertToInt(command.Parameters["amount"]);
-        _player.TakeDamage(amount);
+        
+        if (_useBrowser && _page != null)
+        {
+            _page.EvaluateAsync($"window.testBridge.executeCommand('Damage', null, {{ amount: {amount} }})").Wait();
+        }
+        else if (_player != null)
+        {
+            _player.TakeDamage(amount);
+        }
     }
 
     private void ExecuteHealCommand(TestCommand command)
     {
         var amount = ConvertToInt(command.Parameters["amount"]);
-        _player.Heal(amount);
+        
+        if (_useBrowser && _page != null)
+        {
+            _page.EvaluateAsync($"window.testBridge.executeCommand('Heal', null, {{ amount: {amount} }})").Wait();
+        }
+        else if (_player != null)
+        {
+            _player.Heal(amount);
+        }
     }
 
     private void ExecuteUpdateAICommand()
     {
-        float distance = Vector2D.Distance(_patrolPoint, _player.Position);
-        _currentDecision = _ai.MakeDecision(_player.Health, _player.MaxHealth, distance);
+        if (_player != null && _ai != null)
+        {
+            float distance = Vector2D.Distance(_patrolPoint, _player.Position);
+            _currentDecision = _ai.MakeDecision(_player.Health, _player.MaxHealth, distance);
+        }
     }
 
     private void ExecuteInitializeRenderingCommand(TestCommand command)
@@ -212,17 +324,46 @@ public class WebTestBridge : ITestBridge
         var y = command.Parameters.ContainsKey("y") ? ConvertToFloat(command.Parameters["y"]) : 0f;
         var z = command.Parameters.ContainsKey("z") ? ConvertToFloat(command.Parameters["z"]) : 0f;
 
-        var entity = new EntitySnapshot
+        if (_useBrowser && _page != null)
         {
-            Id = id,
-            Name = name,
-            Type = type,
-            X = x,
-            Y = y,
-            Z = z,
-            IsActive = true
-        };
-        _entities.Add(entity);
+            // If it's a player spawn (no type or type is Player), update the Blazor component
+            if (string.IsNullOrEmpty(type) || type == "Unknown" || type == "Player")
+            {
+                var health = command.Parameters.ContainsKey("health") ? ConvertToInt(command.Parameters["health"]) : 100;
+                _page.EvaluateAsync($"window.testBridge.executeCommand('Spawn', '{id}', {{ " +
+                    $"name: '{name}', x: {x}, y: {y}, health: {health} }})").Wait();
+            }
+            else
+            {
+                // For non-player entities, just track in memory
+                var entity = new EntitySnapshot
+                {
+                    Id = id,
+                    Name = name,
+                    Type = type,
+                    X = x,
+                    Y = y,
+                    Z = z,
+                    IsActive = true
+                };
+                _entities.Add(entity);
+            }
+        }
+        else
+        {
+            // In-memory mode: create entity
+            var entity = new EntitySnapshot
+            {
+                Id = id,
+                Name = name,
+                Type = type,
+                X = x,
+                Y = y,
+                Z = z,
+                IsActive = true
+            };
+            _entities.Add(entity);
+        }
     }
 
     private void ExecuteSetActiveCameraCommand(TestCommand command)
@@ -283,13 +424,15 @@ public class WebTestBridge : ITestBridge
 
     /// <summary>
     /// Gets the current player for direct access in component integration.
+    /// Returns null if using browser mode.
     /// </summary>
-    public Player Player => _player;
+    public Player? Player => _useBrowser ? null : _player;
 
     /// <summary>
     /// Gets the current AI for direct access in component integration.
+    /// Returns null if using browser mode.
     /// </summary>
-    public AI AI => _ai;
+    public AI? AI => _useBrowser ? null : _ai;
 
     /// <summary>
     /// Gets the current patrol point.
@@ -300,4 +443,10 @@ public class WebTestBridge : ITestBridge
     /// Gets the current AI decision.
     /// </summary>
     public AIDecision CurrentDecision => _currentDecision;
+    
+    public void Dispose()
+    {
+        // Browser cleanup handled by test code
+        // In-memory state doesn't need cleanup
+    }
 }

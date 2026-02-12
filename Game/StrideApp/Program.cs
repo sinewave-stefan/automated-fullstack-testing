@@ -1,4 +1,4 @@
-﻿using Game.Core;
+using Game.Core;
 using Microsoft.AspNetCore.SignalR.Client;
 using Stride.Engine;
 using Stride.Core.Mathematics;
@@ -23,6 +23,11 @@ public class MultiplayerGame : Stride.Engine.Game
     private Dictionary<string, Entity> playerEntities = new();
     private Entity? aiEntity;
     private Entity? cameraEntity;
+    
+    // Test mode support
+    public bool IsTestMode { get; set; }
+    private Player? _testPlayer;
+    private AI? _testAI;
 
     protected override void BeginRun()
     {
@@ -47,8 +52,127 @@ public class MultiplayerGame : Stride.Engine.Game
         aiEntity = CreateSimpleEntity("AI", Color.Red);
         SceneSystem.SceneInstance.RootScene.Entities.Add(aiEntity);
 
-        // Connect to multiplayer server (async)
-        _ = ConnectToServer();
+        if (!IsTestMode)
+        {
+            // Connect to multiplayer server (async)
+            _ = ConnectToServer();
+        }
+        else
+        {
+            // Initialize local state for testing
+            InitializeTestState();
+        }
+    }
+    
+    // Public method to manually trigger BeginRun logic for testing
+    // This is a simplified version that doesn't require full game initialization
+    public void InitializeForTesting()
+    {
+        // For testing, we'll use a minimal setup that doesn't require full game initialization
+        // The test bridge will work with the game state directly without needing SceneSystem
+        
+        // Initialize test state - this creates the player and AI objects
+        InitializeTestState();
+    }
+    
+    public void InitializeTestState()
+    {
+        _testPlayer = new Player("TestPlayer", 100);
+        _testAI = new AI(42); // Deterministic seed for testing
+        
+        // Clear existing players
+        allPlayers.Clear();
+        
+        // Create a player entity for test mode
+        if (SceneSystem?.SceneInstance?.RootScene != null)
+        {
+            var testPlayerEntity = CreateSimpleEntity("TestPlayer", Color.Blue);
+            testPlayerEntity.Transform.Position = new Vector3(_testPlayer.Position.X, 0, _testPlayer.Position.Y);
+            playerEntities["TestPlayer"] = testPlayerEntity;
+            SceneSystem.SceneInstance.RootScene.Entities.Add(testPlayerEntity);
+        }
+        
+        // Initialize AI position
+        var patrolPoint = _testAI.GeneratePatrolPoint(new Vector2D(0, 0), 15);
+        aiPosition = new PositionDto { X = patrolPoint.X, Y = patrolPoint.Y };
+        if (aiEntity != null)
+        {
+            aiEntity.Transform.Position = new Vector3(aiPosition.X, 0, aiPosition.Y);
+        }
+        
+        allPlayers.Add(new PlayerDto
+        {
+            Id = "TestPlayer",
+            Name = _testPlayer.Name,
+            Health = _testPlayer.Health,
+            MaxHealth = _testPlayer.MaxHealth,
+            PositionX = _testPlayer.Position.X,
+            PositionY = _testPlayer.Position.Y,
+            IsAlive = _testPlayer.IsAlive
+        });
+    }
+    
+    // Expose test state for test bridge access
+    public Player? TestPlayer => _testPlayer;
+    public AI? TestAI => _testAI;
+    
+    // Public method for test bridge to call Update
+    public void TestUpdate(GameTime gameTime)
+    {
+        Update(gameTime);
+    }
+    
+    // Public method to manually trigger BeginRun for test initialization
+    public void TestBeginRun()
+    {
+        BeginRun();
+    }
+    
+    // Methods for test bridge to control game state
+    public void TestMovePlayer(float deltaX, float deltaY)
+    {
+        if (_testPlayer != null && IsTestMode)
+        {
+            _testPlayer.Move(deltaX, deltaY);
+            UpdateTestPlayerEntity();
+        }
+    }
+    
+    public void TestTakeDamage(int amount)
+    {
+        if (_testPlayer != null && IsTestMode)
+        {
+            _testPlayer.TakeDamage(amount);
+            UpdateTestPlayerEntity();
+        }
+    }
+    
+    public void TestHeal(int amount)
+    {
+        if (_testPlayer != null && IsTestMode)
+        {
+            _testPlayer.Heal(amount);
+            UpdateTestPlayerEntity();
+        }
+    }
+    
+    private void UpdateTestPlayerEntity()
+    {
+        if (_testPlayer != null && playerEntities.TryGetValue("TestPlayer", out var entity))
+        {
+            entity.Transform.Position = new Vector3(_testPlayer.Position.X, 0, _testPlayer.Position.Y);
+            
+            // Update DTO
+            var dto = allPlayers.FirstOrDefault(p => p.Id == "TestPlayer");
+            if (dto != null)
+            {
+                dto.Health = _testPlayer.Health;
+                dto.MaxHealth = _testPlayer.MaxHealth;
+                dto.PositionX = _testPlayer.Position.X;
+                dto.PositionY = _testPlayer.Position.Y;
+                dto.IsAlive = _testPlayer.IsAlive;
+            }
+        }
     }
 
     private void InitializeGraphicsCompositor()
@@ -190,7 +314,7 @@ public class MultiplayerGame : Stride.Engine.Game
         }
     }
 
-    private Entity CreateSimpleEntity(string name, Color color)
+    public Entity CreateSimpleEntity(string name, Color color)
     {
         // Create simple material
         var material = Material.New(GraphicsDevice, new MaterialDescriptor
