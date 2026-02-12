@@ -83,6 +83,57 @@ public class TestCommand
             Parameters = new()
         };
     }
+
+    /// <summary>
+    /// Creates a spawn entity command.
+    /// </summary>
+    public static TestCommand SpawnEntity(string entityId, string name, string type, float x = 0, float y = 0, float z = 0)
+    {
+        return new TestCommand
+        {
+            Type = TestCommandType.Spawn,
+            TargetId = entityId,
+            Parameters = new()
+            {
+                { "name", name },
+                { "type", type },
+                { "x", x },
+                { "y", y },
+                { "z", z }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Creates a command to initialize the rendering system.
+    /// </summary>
+    public static TestCommand InitializeRendering(int cameraSlots = 1)
+    {
+        return new TestCommand
+        {
+            Type = TestCommandType.InitializeRendering,
+            Parameters = new()
+            {
+                { "cameraSlots", cameraSlots }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Creates a command to set the active camera.
+    /// </summary>
+    public static TestCommand SetActiveCamera(string cameraEntityId, int slotIndex = 0)
+    {
+        return new TestCommand
+        {
+            Type = TestCommandType.SetActiveCamera,
+            TargetId = cameraEntityId,
+            Parameters = new()
+            {
+                { "slotIndex", slotIndex }
+            }
+        };
+    }
 }
 
 /// <summary>
@@ -119,5 +170,15 @@ public enum TestCommandType
     /// <summary>
     /// Remove an entity.
     /// </summary>
-    Remove
+    Remove,
+
+    /// <summary>
+    /// Initialize the rendering system with specified configuration.
+    /// </summary>
+    InitializeRendering,
+
+    /// <summary>
+    /// Set the active camera for rendering.
+    /// </summary>
+    SetActiveCamera
 }

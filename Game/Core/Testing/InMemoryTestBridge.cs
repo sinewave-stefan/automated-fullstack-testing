@@ -9,6 +9,8 @@ public class InMemoryTestBridge : ITestBridge
     private int _currentFrame;
     private readonly Dictionary<string, Player> _players = new();
     private readonly Dictionary<string, (AI ai, Vector2D position)> _aiEntities = new();
+    private readonly Dictionary<string, EntitySnapshot> _entities = new();
+    private RenderingSnapshot _rendering = new();
     private const float FixedDeltaTime = 1.0f / 60.0f; // 60 FPS
 
     public bool IsTestMode => true;
@@ -38,13 +40,16 @@ public class InMemoryTestBridge : ITestBridge
         _currentFrame = 0;
         _players.Clear();
         _aiEntities.Clear();
+        _entities.Clear();
+        _rendering = new RenderingSnapshot();
     }
 
     public TestSnapshot GetSnapshot()
     {
         var snapshot = new TestSnapshot
         {
-            Frame = _currentFrame
+            Frame = _currentFrame,
+            Rendering = _rendering
         };
 
         foreach (var kvp in _players)
@@ -72,6 +77,11 @@ public class InMemoryTestBridge : ITestBridge
             });
         }
 
+        foreach (var kvp in _entities)
+        {
+            snapshot.Entities.Add(kvp.Value);
+        }
+
         return snapshot;
     }
 
@@ -93,6 +103,14 @@ public class InMemoryTestBridge : ITestBridge
 
             case TestCommandType.Spawn:
                 ExecuteSpawnCommand(command);
+                break;
+
+            case TestCommandType.InitializeRendering:
+                ExecuteInitializeRenderingCommand(command);
+                break;
+
+            case TestCommandType.SetActiveCamera:
+                ExecuteSetActiveCameraCommand(command);
                 break;
 
             default:
@@ -132,22 +150,67 @@ public class InMemoryTestBridge : ITestBridge
     private void ExecuteSpawnCommand(TestCommand command)
     {
         var id = command.TargetId ?? Guid.NewGuid().ToString();
-        var name = command.Parameters.ContainsKey("name") 
-            ? command.Parameters["name"].ToString() ?? "Player"
-            : "Player";
-        var x = command.Parameters.ContainsKey("x") 
-            ? ConvertToFloat(command.Parameters["x"]) 
-            : 0f;
-        var y = command.Parameters.ContainsKey("y") 
-            ? ConvertToFloat(command.Parameters["y"]) 
-            : 0f;
-        var health = command.Parameters.ContainsKey("health") 
-            ? ConvertToInt(command.Parameters["health"]) 
-            : 100;
+        
+        // Check if this is an entity spawn (has "type" parameter) or player spawn
+        if (command.Parameters.ContainsKey("type"))
+        {
+            var name = command.Parameters.ContainsKey("name") 
+                ? command.Parameters["name"].ToString() ?? "Entity"
+                : "Entity";
+            var type = command.Parameters["type"].ToString() ?? "Unknown";
+            var x = command.Parameters.ContainsKey("x") ? ConvertToFloat(command.Parameters["x"]) : 0f;
+            var y = command.Parameters.ContainsKey("y") ? ConvertToFloat(command.Parameters["y"]) : 0f;
+            var z = command.Parameters.ContainsKey("z") ? ConvertToFloat(command.Parameters["z"]) : 0f;
 
-        var player = new Player(name, health);
-        player.Move(x, y);
-        _players[id] = player;
+            _entities[id] = new EntitySnapshot
+            {
+                Id = id,
+                Name = name,
+                Type = type,
+                X = x,
+                Y = y,
+                Z = z,
+                IsActive = true
+            };
+        }
+        else
+        {
+            // Player spawn
+            var name = command.Parameters.ContainsKey("name") 
+                ? command.Parameters["name"].ToString() ?? "Player"
+                : "Player";
+            var x = command.Parameters.ContainsKey("x") ? ConvertToFloat(command.Parameters["x"]) : 0f;
+            var y = command.Parameters.ContainsKey("y") ? ConvertToFloat(command.Parameters["y"]) : 0f;
+            var health = command.Parameters.ContainsKey("health") ? ConvertToInt(command.Parameters["health"]) : 100;
+
+            var player = new Player(name, health);
+            player.Move(x, y);
+            _players[id] = player;
+        }
+    }
+
+    private void ExecuteInitializeRenderingCommand(TestCommand command)
+    {
+        var cameraSlots = command.Parameters.ContainsKey("cameraSlots") 
+            ? ConvertToInt(command.Parameters["cameraSlots"]) 
+            : 1;
+
+        _rendering = new RenderingSnapshot
+        {
+            IsInitialized = true,
+            CameraSlotCount = cameraSlots,
+            RenderStageCount = 2, // Default: Opaque + Transparent
+            Width = 1920,
+            Height = 1080
+        };
+    }
+
+    private void ExecuteSetActiveCameraCommand(TestCommand command)
+    {
+        if (command.TargetId == null)
+            return;
+
+        _rendering.ActiveCameraId = command.TargetId;
     }
 
     private static float ConvertToFloat(object value)

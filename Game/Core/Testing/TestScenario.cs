@@ -8,7 +8,9 @@ public class TestScenario
 {
     private readonly ITestBridge _bridge;
     private readonly Dictionary<string, string> _playerIds = new();
+    private readonly Dictionary<string, string> _entityIds = new();
     private int _nextPlayerId = 1;
+    private int _nextEntityId = 1;
 
     public TestScenario(ITestBridge bridge)
     {
@@ -22,7 +24,9 @@ public class TestScenario
     {
         _bridge.Reset();
         _playerIds.Clear();
+        _entityIds.Clear();
         _nextPlayerId = 1;
+        _nextEntityId = 1;
         return this;
     }
 
@@ -51,6 +55,38 @@ public class TestScenario
         _bridge.ExecuteCommand(spawnCommand);
 
         return new PlayerHandle(playerId, name, this);
+    }
+
+    /// <summary>
+    /// Creates a generic entity (camera, light, model, etc.)
+    /// </summary>
+    public EntityHandle Entity(string name, string type, float x = 0, float y = 0, float z = 0)
+    {
+        var entityId = $"entity{_nextEntityId++}";
+        _entityIds[name] = entityId;
+
+        var command = TestCommand.SpawnEntity(entityId, name, type, x, y, z);
+        _bridge.ExecuteCommand(command);
+
+        return new EntityHandle(entityId, name, type, this);
+    }
+
+    /// <summary>
+    /// Creates a camera entity.
+    /// </summary>
+    public EntityHandle Camera(string name, float x = 0, float y = 0, float z = 0)
+    {
+        return Entity(name, "Camera", x, y, z);
+    }
+
+    /// <summary>
+    /// Initializes the rendering system with the specified number of camera slots.
+    /// </summary>
+    public TestScenario InitializeRendering(int cameraSlots = 1)
+    {
+        var command = TestCommand.InitializeRendering(cameraSlots);
+        _bridge.ExecuteCommand(command);
+        return this;
     }
 
     /// <summary>
@@ -91,6 +127,53 @@ public class TestScenario
     internal string GetPlayerId(string name)
     {
         return _playerIds.TryGetValue(name, out var id) ? id : name;
+    }
+
+    internal string GetEntityId(string name)
+    {
+        return _entityIds.TryGetValue(name, out var id) ? id : name;
+    }
+}
+
+/// <summary>
+/// Handle for a generic entity in the test scenario.
+/// </summary>
+public class EntityHandle
+{
+    private readonly string _entityId;
+    private readonly string _entityName;
+    private readonly string _entityType;
+    private readonly TestScenario _scenario;
+
+    internal EntityHandle(string entityId, string entityName, string entityType, TestScenario scenario)
+    {
+        _entityId = entityId;
+        _entityName = entityName;
+        _entityType = entityType;
+        _scenario = scenario;
+    }
+
+    public string Id => _entityId;
+    public string Name => _entityName;
+    public string Type => _entityType;
+
+    /// <summary>
+    /// Sets this entity as the active camera (if it's a camera).
+    /// </summary>
+    public EntityHandle SetAsActiveCamera(int slotIndex = 0)
+    {
+        var command = TestCommand.SetActiveCamera(_entityId, slotIndex);
+        _scenario.ExecuteCommand(command);
+        return this;
+    }
+
+    /// <summary>
+    /// Advances simulation after this operation.
+    /// </summary>
+    public EntityHandle ThenStep(int frames = 1)
+    {
+        _scenario.Step(frames);
+        return this;
     }
 }
 
@@ -285,6 +368,173 @@ public class AssertionHelper
         }
 
         return new PlayerAssertions(playerSnapshot);
+    }
+
+    /// <summary>
+    /// Asserts on the rendering system.
+    /// </summary>
+    public RenderingAssertions Rendering()
+    {
+        var snapshot = _scenario.GetSnapshot();
+        return new RenderingAssertions(snapshot.Rendering);
+    }
+
+    /// <summary>
+    /// Asserts on a specific entity.
+    /// </summary>
+    public EntityAssertions Entity(EntityHandle entity)
+    {
+        var snapshot = _scenario.GetSnapshot();
+        var entitySnapshot = snapshot.Entities.FirstOrDefault(e => e.Id == entity.Id);
+        
+        if (entitySnapshot == null)
+        {
+            throw new InvalidOperationException($"Entity {entity.Name} not found in snapshot");
+        }
+
+        return new EntityAssertions(entitySnapshot);
+    }
+
+    /// <summary>
+    /// Asserts on an entity by name.
+    /// </summary>
+    public EntityAssertions Entity(string entityName)
+    {
+        var entityId = _scenario.GetEntityId(entityName);
+        var snapshot = _scenario.GetSnapshot();
+        var entitySnapshot = snapshot.Entities.FirstOrDefault(e => e.Id == entityId || e.Name == entityName);
+        
+        if (entitySnapshot == null)
+        {
+            throw new InvalidOperationException($"Entity {entityName} not found in snapshot");
+        }
+
+        return new EntityAssertions(entitySnapshot);
+    }
+}
+
+/// <summary>
+/// Assertions for rendering system state.
+/// </summary>
+public class RenderingAssertions
+{
+    private readonly RenderingSnapshot _snapshot;
+
+    internal RenderingAssertions(RenderingSnapshot snapshot)
+    {
+        _snapshot = snapshot;
+    }
+
+    /// <summary>
+    /// Asserts the rendering system is initialized.
+    /// </summary>
+    public RenderingAssertions IsInitialized()
+    {
+        if (!_snapshot.IsInitialized)
+        {
+            throw new InvalidOperationException("Expected rendering system to be initialized");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts the rendering system has at least the specified number of camera slots.
+    /// </summary>
+    public RenderingAssertions HasCameraSlots(int minCount = 1)
+    {
+        if (_snapshot.CameraSlotCount < minCount)
+        {
+            throw new InvalidOperationException(
+                $"Expected at least {minCount} camera slot(s) but found {_snapshot.CameraSlotCount}");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts an active camera is set.
+    /// </summary>
+    public RenderingAssertions HasActiveCamera()
+    {
+        if (string.IsNullOrEmpty(_snapshot.ActiveCameraId))
+        {
+            throw new InvalidOperationException("Expected an active camera to be set");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts the viewport/canvas has the expected dimensions.
+    /// </summary>
+    public RenderingAssertions HasDimensions(int width, int height)
+    {
+        if (_snapshot.Width != width || _snapshot.Height != height)
+        {
+            throw new InvalidOperationException(
+                $"Expected dimensions ({width}x{height}) but was ({_snapshot.Width}x{_snapshot.Height})");
+        }
+        return this;
+    }
+}
+
+/// <summary>
+/// Assertions for a specific entity.
+/// </summary>
+public class EntityAssertions
+{
+    private readonly EntitySnapshot _snapshot;
+
+    internal EntityAssertions(EntitySnapshot snapshot)
+    {
+        _snapshot = snapshot;
+    }
+
+    /// <summary>
+    /// Asserts the entity exists.
+    /// </summary>
+    public EntityAssertions Exists()
+    {
+        // If we got here, entity exists
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts the entity is of the expected type.
+    /// </summary>
+    public EntityAssertions IsOfType(string type)
+    {
+        if (_snapshot.Type != type)
+        {
+            throw new InvalidOperationException(
+                $"Expected entity type '{type}' but was '{_snapshot.Type}'");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts the entity is active.
+    /// </summary>
+    public EntityAssertions IsActive()
+    {
+        if (!_snapshot.IsActive)
+        {
+            throw new InvalidOperationException("Expected entity to be active");
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Asserts the entity's position.
+    /// </summary>
+    public EntityAssertions HasPosition(float x, float y, float z = 0, float tolerance = 0.01f)
+    {
+        if (Math.Abs(_snapshot.X - x) > tolerance ||
+            Math.Abs(_snapshot.Y - y) > tolerance ||
+            Math.Abs(_snapshot.Z - z) > tolerance)
+        {
+            throw new InvalidOperationException(
+                $"Expected position ({x}, {y}, {z}) but was ({_snapshot.X}, {_snapshot.Y}, {_snapshot.Z})");
+        }
+        return this;
     }
 }
 
