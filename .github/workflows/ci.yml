@@ -33,6 +33,12 @@ jobs:
     - name: Run Integration Tests
       run: dotnet test tests/Integration/Game.IntegrationTests.csproj --configuration Release --no-build --verbosity normal
     
+    - name: Run Test Framework Tests
+      run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal
+    
+    - name: Run Unified Test Specs with InMemory Bridge
+      run: dotnet run --project tests/TestRunner/Game.TestRunner.csproj --configuration Release --no-build tests/TestSpecs/*.json
+    
     - name: Publish WebApp
       run: dotnet publish Game/WebApp/Game.WebApp.csproj --configuration Release --output ./publish/web
     
