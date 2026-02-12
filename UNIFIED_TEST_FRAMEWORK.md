@@ -49,9 +49,10 @@ This implementation provides a unified test framework that allows writing platfo
 
 1. **TestFrameworkTests** (xUnit Test Project)
    - Comprehensive tests validating the framework
-   - Tests using fluent API (`ScenarioApiTests.cs`)
-   - Tests command execution and infrastructure (`TestFrameworkTests.cs`)
-   - Tests assertion verification
+   - Tests using fluent API (`ScenarioApiTests.cs`) - User-facing API tests
+   - Tests infrastructure components (`InfrastructureTests.cs`) - Low-level bridge and executor tests
+   - Tests rendering system (`RenderingTests.cs`)
+   - Tests platform integration (`PlatformIntegrationTests.cs`) - Cross-platform framework verification
 
 ### CI/CD Integration
 

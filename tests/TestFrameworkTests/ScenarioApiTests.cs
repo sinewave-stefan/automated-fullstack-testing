@@ -4,8 +4,11 @@ using Game.Core.Testing;
 namespace Game.TestFrameworkTests;
 
 /// <summary>
-/// Tests using the fluent scenario API.
+/// Tests using the fluent scenario API (user-facing API).
 /// Demonstrates code-based test authoring with readable DSL.
+/// 
+/// These tests exercise the framework through the high-level fluent API (TestScenario).
+/// For low-level infrastructure tests (bridges, executors), see InfrastructureTests.cs.
 /// </summary>
 public class ScenarioApiTests
 {

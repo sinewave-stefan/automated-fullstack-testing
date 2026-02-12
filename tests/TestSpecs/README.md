@@ -39,7 +39,7 @@ The `TestSpec` JSON format and `TestSpecExecutor` infrastructure exists for pote
 
 **However, for C# test development, use the fluent API instead.**
 
-The JSON infrastructure (`TestSpec`, `TestSpecExecutor`) is still maintained and tested, but JSON test spec files are no longer included in this repository. If you need to use JSON specs programmatically, you can create `TestSpec` objects in code (see `TestFrameworkTests.cs` for examples).
+The JSON infrastructure (`TestSpec`, `TestSpecExecutor`) is still maintained and tested, but JSON test spec files are no longer included in this repository. If you need to use JSON specs programmatically, you can create `TestSpec` objects in code (see `InfrastructureTests.cs` for examples).
 
 ## Test Bridge Implementations
 

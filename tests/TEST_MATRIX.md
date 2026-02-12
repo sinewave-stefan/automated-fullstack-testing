@@ -15,14 +15,17 @@ The test matrix consists of tests that run against multiple `ITestBridge` implem
 ### Option 1: Run All Tests by Category
 
 ```powershell
-# Run all fluent API tests (InMemory only - fast)
+# Run fluent API tests (user-facing API - InMemory only - fast)
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~ScenarioApiTests"
+
+# Run infrastructure tests (low-level bridge & executor - InMemory only - fast)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~InfrastructureTests"
 
 # Run rendering tests (InMemory - fast)
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~RenderingTests"
 
-# Run integration tests (Stride + Web matrix)
-dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests"
+# Run platform integration tests (Stride + Web matrix)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~PlatformIntegrationTests"
 ```
 
 ### Option 2: Run Everything
@@ -36,8 +39,11 @@ This runs:
 - Unit tests (InMemory)
 - Integration tests (InMemory)
 - Server tests
-- Framework tests (InMemory + Stride + Web integration)
-- Rendering tests (InMemory)
+- Framework tests:
+  - Fluent API tests (InMemory)
+  - Infrastructure tests (InMemory)
+  - Rendering tests (InMemory)
+  - Platform integration tests (Stride + Web)
 
 ## Test Matrix Structure
 
@@ -51,9 +57,9 @@ Fast InMemory tests for rendering system initialization:
 
 These tests use `InMemoryTestBridge` for fast execution without requiring platform runtimes.
 
-### Integration Tests (`tests/TestFrameworkTests/IntegrationTests.cs`)
+### Platform Integration Tests (`tests/TestFrameworkTests/PlatformIntegrationTests.cs`)
 
-**Unified Integration Tests** - Matrix-based test suite that runs the same tests against both Stride and Web platforms:
+**Platform Integration Tests** - Matrix-based test suite that verifies the test framework works correctly across both Stride and Web platforms:
 - Uses `[Theory]` with `[MemberData]` to run each test against multiple bridges
 - Tests player movement, damage, and rendering initialization across platforms
 - Automatically handles platform-specific setup (GameContext for Stride, Playwright for Web)
@@ -62,10 +68,10 @@ These tests use `InMemoryTestBridge` for fast execution without requiring platfo
 - ✅ **Stride**: Real Stride game engine instances with full initialization
 - ✅ **Web**: Real Blazor WebAssembly instances with Playwright automation
 
-**Running Integration Tests:**
+**Running Platform Integration Tests:**
 ```powershell
-# Run all integration tests (runs against both Stride and Web)
-dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests"
+# Run all platform integration tests (runs against both Stride and Web)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~PlatformIntegrationTests"
 ```
 
 **Stride Integration Details:**
@@ -102,11 +108,11 @@ dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "Fu
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests" --filter "TestCategory=Web"
 ```
 
-### Integration Tests (Stride + Web Matrix)
+### Platform Integration Tests (Stride + Web Matrix)
 
 ```powershell
-# Run unified integration tests (runs against both Stride and Web)
-dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~IntegrationTests"
+# Run platform integration tests (runs against both Stride and Web)
+dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --filter "FullyQualifiedName~PlatformIntegrationTests"
 ```
 
 ## Test Output
@@ -130,13 +136,13 @@ The CI/CD pipeline runs:
 1. **Unit Tests** - Fast InMemory tests
 2. **Framework Tests** - InMemory + Stride + Web integration
 3. **Rendering Tests** - InMemory rendering system tests
-4. **Integration Tests** - Unified matrix (Stride + Web)
+4. **Platform Integration Tests** - Test framework cross-platform verification (Stride + Web)
 
 See `.github/workflows/ci.yml` for the complete test matrix execution.
 
 ## Adding New Bridges to the Matrix
 
-To add a new bridge to the integration test matrix, update `TestBridges()` in `tests/TestFrameworkTests/IntegrationTests.cs`:
+To add a new bridge to the platform integration test matrix, update `TestBridges()` in `tests/TestFrameworkTests/PlatformIntegrationTests.cs`:
 
 ```csharp
 public static IEnumerable<object[]> TestBridges()

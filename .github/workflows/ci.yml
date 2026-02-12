@@ -41,8 +41,8 @@ jobs:
     - name: Run Test Framework Tests
       run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal
     
-    - name: Run Integration Tests (Stride + Web Matrix)
-      run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal --filter "FullyQualifiedName~IntegrationTests"
+    - name: Run Platform Integration Tests (Stride + Web Matrix)
+      run: dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-build --verbosity normal --filter "FullyQualifiedName~PlatformIntegrationTests"
       continue-on-error: true  # Allow to fail if Stride setup issues
     
     - name: Publish WebApp

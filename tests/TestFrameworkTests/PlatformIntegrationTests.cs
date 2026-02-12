@@ -6,10 +6,11 @@ using Xunit;
 namespace Game.TestFrameworkTests;
 
 /// <summary>
-/// Unified integration tests that run against both Stride and Web (Blazor) platforms.
-/// These tests verify that the fluent API works consistently across all platforms.
+/// Platform integration tests that verify the test framework works correctly across different platforms.
+/// These tests run against both Stride and Web (Blazor) platforms to ensure the fluent API works consistently.
+/// Unlike game integration tests (in tests/Integration/), these test the framework's cross-platform capabilities.
 /// </summary>
-public class IntegrationTests : IDisposable
+public class PlatformIntegrationTests : IDisposable
 {
     private readonly List<IDisposable> _disposables = new();
 

@@ -49,8 +49,10 @@ A demonstration project showing how to maximize code reuse between native (Strid
     ├── ServerTests/           # 🧪 Server integration tests
     │   └── GameHubTests.cs    # SignalR hub tests
     ├── TestFrameworkTests/    # ⚙️ Unified test framework validation
-    │   ├── ScenarioApiTests.cs # Fluent API tests
-    │   └── TestFrameworkTests.cs # Infrastructure tests
+    │   ├── ScenarioApiTests.cs # Fluent API tests (user-facing)
+    │   ├── InfrastructureTests.cs # Low-level bridge & executor tests
+    │   ├── RenderingTests.cs # Rendering system tests
+    │   └── PlatformIntegrationTests.cs # Cross-platform framework tests
     └── TestSpecs/             # 📋 Test framework documentation
         ├── README.md          # Test framework overview
         └── FLUENT_API_EXAMPLES.md # Fluent API examples

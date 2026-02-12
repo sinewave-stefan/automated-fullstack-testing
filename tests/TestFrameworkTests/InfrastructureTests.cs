@@ -4,10 +4,13 @@ using Game.Core.Testing;
 namespace Game.TestFrameworkTests;
 
 /// <summary>
-/// Tests for the unified test framework infrastructure.
+/// Tests for the unified test framework infrastructure (low-level components).
 /// Validates ITestBridge implementations and TestSpecExecutor functionality.
+/// 
+/// These tests exercise the framework infrastructure directly, without using the fluent API.
+/// For tests of the user-facing fluent API, see ScenarioApiTests.cs.
 /// </summary>
-public class TestFrameworkTests
+public class InfrastructureTests
 {
     [Fact]
     public void InMemoryTestBridge_ExecutesBasicCommands()
