@@ -8,6 +8,7 @@ using Stride.Rendering.Materials;
 using Stride.Rendering.Materials.ComputeColors;
 using Stride.Input;
 using Stride.Games;
+using Stride.Rendering.Compositing;
 
 /// <summary>
 /// Stride multiplayer game client that connects to the game server
@@ -27,6 +28,9 @@ class MultiplayerGame : Stride.Engine.Game
     {
         base.BeginRun();
 
+        // Initialize GraphicsCompositor with camera slots
+        InitializeGraphicsCompositor();
+
         // Setup camera
         cameraEntity = new Entity("Camera")
         {
@@ -45,6 +49,58 @@ class MultiplayerGame : Stride.Engine.Game
 
         // Connect to multiplayer server (async)
         _ = ConnectToServer();
+    }
+
+    private void InitializeGraphicsCompositor()
+    {
+        // Create a basic graphics compositor with camera slot
+        var compositor = new GraphicsCompositor();
+        
+        // Add a camera slot
+        var cameraSlot = new SceneCameraSlot();
+        compositor.Cameras.Add(cameraSlot);
+
+        // Create a simple forward renderer
+        var opaqueRenderStage = new RenderStage("Opaque", "Main");
+        compositor.RenderStages.Add(opaqueRenderStage);
+
+        var transparentRenderStage = new RenderStage("Transparent", "Main");
+        compositor.RenderStages.Add(transparentRenderStage);
+
+        // Create render features
+        var meshRenderFeature = new MeshRenderFeature();
+        meshRenderFeature.RenderStageSelectors.Add(new SimpleGroupToRenderStageSelector
+        {
+            EffectName = "StrideForwardShadingEffect",
+            RenderStage = opaqueRenderStage
+        });
+        meshRenderFeature.RenderStageSelectors.Add(new SimpleGroupToRenderStageSelector
+        {
+            EffectName = "StrideForwardShadingEffect.Transparent",
+            RenderStage = transparentRenderStage
+        });
+        compositor.RenderFeatures.Add(meshRenderFeature);
+
+        // Create a simple forward renderer
+        var sceneRenderer = new SceneCameraRenderer
+        {
+            Mode = new CameraRendererModeForward(),
+            Camera = cameraSlot,
+            Child = new SceneRendererCollection
+            {
+                new ClearRenderFrameRenderer
+                {
+                    Color = Color.CornflowerBlue,
+                    Name = "Clear"
+                },
+                new RenderStageRenderer(opaqueRenderStage),
+                new RenderStageRenderer(transparentRenderStage)
+            }
+        };
+
+        compositor.SingleView = sceneRenderer;
+
+        SceneSystem.GraphicsCompositor = compositor;
     }
 
     private async Task ConnectToServer()

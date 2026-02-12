@@ -1,12 +1,11 @@
 using Game.Core;
 using Game.Core.Testing;
-using System.Text.Json;
 
 namespace Game.TestFrameworkTests;
 
 /// <summary>
-/// Tests for the unified test framework.
-/// Validates that test specs can be loaded and executed.
+/// Tests for the unified test framework infrastructure.
+/// Validates ITestBridge implementations and TestSpecExecutor functionality.
 /// </summary>
 public class TestFrameworkTests
 {
@@ -140,61 +139,4 @@ public class TestFrameworkTests
         Assert.True(result.StepResults[0].Success);
     }
 
-    [Fact]
-    public void TestSpecExecutor_LoadsAndExecutesMovementSpec()
-    {
-        // Arrange
-        var specPath = Path.Combine(AppContext.BaseDirectory, "player-movement.json");
-        if (!File.Exists(specPath))
-        {
-            // Skip test if spec file is not available
-            return;
-        }
-
-        var json = File.ReadAllText(specPath);
-        var spec = JsonSerializer.Deserialize<TestSpec>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        Assert.NotNull(spec);
-
-        var bridge = new InMemoryTestBridge();
-        var executor = new TestSpecExecutor(bridge);
-
-        // Act
-        var result = executor.Execute(spec);
-
-        // Assert
-        Assert.True(result.Success, result.FailureReason ?? "No failure reason");
-    }
-
-    [Fact]
-    public void TestSpecExecutor_LoadsAndExecutesDamageSpec()
-    {
-        // Arrange
-        var specPath = Path.Combine(AppContext.BaseDirectory, "player-damage.json");
-        if (!File.Exists(specPath))
-        {
-            // Skip test if spec file is not available
-            return;
-        }
-
-        var json = File.ReadAllText(specPath);
-        var spec = JsonSerializer.Deserialize<TestSpec>(json, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        Assert.NotNull(spec);
-
-        var bridge = new InMemoryTestBridge();
-        var executor = new TestSpecExecutor(bridge);
-
-        // Act
-        var result = executor.Execute(spec);
-
-        // Assert
-        Assert.True(result.Success, result.FailureReason ?? "No failure reason");
-    }
 }

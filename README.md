@@ -214,37 +214,17 @@ private void TestPlayerMovement(ITestBridge bridge)
 [Fact] void Test_Stride() => TestPlayerMovement(new StrideTestBridge());
 ```
 
-**Alternative: JSON-Based Tests (also supported):**
-```json
-{
-  "id": "player-movement-test",
-  "setup": {
-    "players": [{"id": "p1", "x": 0, "y": 0, "health": 100}]
-  },
-  "steps": [{
-    "command": {"type": "Move", "targetId": "p1", 
-                "parameters": {"deltaX": 10, "deltaY": 5}},
-    "assertions": [
-      {"type": "PlayerPositionX", "targetId": "p1", "expected": 10.0}
-    ]
-  }]
-}
-```
-
 **Running Tests:**
 ```bash
 # Run fluent API tests
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj
-
-# Run JSON-based test specs
-dotnet run --project tests/TestRunner/Game.TestRunner.csproj
 ```
 
 See `tests/TestSpecs/FLUENT_API_EXAMPLES.md` for comprehensive examples.
 
 Run tests with:
 ```bash
-# All tests (51 total: 26 unit + 3 integration + 6 server + 13 framework + 3 JSON specs)
+# All tests (48 total: 26 unit + 3 integration + 6 server + 13 framework)
 dotnet test
 
 # Specific test project

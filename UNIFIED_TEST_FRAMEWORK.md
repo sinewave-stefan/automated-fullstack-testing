@@ -54,15 +54,10 @@ This implementation provides a unified test framework that allows writing platfo
    - Returns appropriate exit codes for CI
 
 2. **TestFrameworkTests** (xUnit Test Project)
-   - 7 comprehensive tests validating the framework
-   - Tests command execution
-   - Tests spec loading and parsing
+   - Comprehensive tests validating the framework
+   - Tests using fluent API (`ScenarioApiTests.cs`)
+   - Tests command execution and infrastructure (`TestFrameworkTests.cs`)
    - Tests assertion verification
-
-3. **Test Specifications** (JSON files)
-   - `player-movement.json` - Movement validation
-   - `player-damage.json` - Damage and death scenarios  
-   - `player-combat.json` - Complex multi-player combat
 
 ### CI/CD Integration
 
@@ -73,19 +68,29 @@ Updated `.github/workflows/ci.yml` to include:
 
 ## How It Works
 
-### Test Specification Flow
+### Primary Approach: Fluent API
+
+Tests are written using the `TestScenario` fluent API, which provides type-safe, IntelliSense-enabled test authoring:
+
+```csharp
+var bridge = new InMemoryTestBridge();
+var scenario = new TestScenario(bridge);
+
+var warrior = scenario.Player("Warrior", x: 0, y: 0, health: 100);
+
+warrior.Move(10, 5).ThenStep();
+scenario.Assert.Player(warrior).HasPosition(10, 5);
+
+warrior.TakeDamage(30).ThenStep();
+scenario.Assert.Player(warrior).HasHealth(70).IsAlive();
+```
+
+### Test Flow
 
 ```
 ┌─────────────────┐
-│  Test Spec.json │
-│  (Platform-     │
-│   agnostic)     │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ TestSpecExecutor│
-│                 │
+│  TestScenario   │
+│  (Fluent API)   │
 └────────┬────────┘
          │
          ▼
@@ -96,28 +101,9 @@ Updated `.github/workflows/ci.yml` to include:
 └─────────────────┘
 ```
 
-### Example Test Spec
+### JSON Infrastructure (Available for Future Use)
 
-```json
-{
-  "id": "player-movement-test",
-  "name": "Player Movement Test",
-  "setup": {
-    "players": [
-      {"id": "player1", "name": "Test", "x": 0, "y": 0, "health": 100}
-    ]
-  },
-  "steps": [
-    {
-      "command": {"type": "Move", "targetId": "player1", 
-                  "parameters": {"deltaX": 10, "deltaY": 5}},
-      "assertions": [
-        {"type": "PlayerPositionX", "targetId": "player1", "expected": 10.0}
-      ]
-    }
-  ]
-}
-```
+The `TestSpec` JSON format and `TestSpecExecutor` infrastructure exists for potential non-C# test runners, but JSON test spec files are not included. The fluent API is the recommended approach for C# development.
 
 ## Test Results
 
@@ -125,10 +111,9 @@ All tests passing:
 - **Unit Tests**: 26 passing ✓
 - **Integration Tests**: 3 passing ✓
 - **Server Tests**: 6 passing ✓  
-- **Test Framework Tests**: 7 passing ✓
-- **Unified Test Specs**: 3 passing ✓
+- **Test Framework Tests**: 13 passing ✓ (7 fluent API + 6 infrastructure)
 
-**Total: 45 tests, 0 failures**
+**Total: 48 tests, 0 failures**
 
 ## Key Benefits
 
@@ -196,34 +181,44 @@ test-stride:
 ### Running Tests Locally
 
 ```bash
-# Run all test specs
-dotnet run --project tests/TestRunner/Game.TestRunner.csproj
-
-# Run specific spec
-dotnet run --project tests/TestRunner/Game.TestRunner.csproj tests/TestSpecs/player-combat.json
-
-# Run framework validation
+# Run all tests (includes fluent API tests)
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj
+
+# Run all tests
+dotnet test
 ```
 
 ### Creating New Tests
 
-1. Create a JSON file in `tests/TestSpecs/`
-2. Define setup (initial players, AI)
-3. Add test steps (commands + assertions)
-4. Run with TestRunner to validate
-5. Add to CI if needed
+1. Add a new test method to `ScenarioApiTests.cs` or create a new test class
+2. Use the fluent `TestScenario` API to write your test
+3. Run tests to validate
+4. See `tests/TestSpecs/FLUENT_API_EXAMPLES.md` for comprehensive examples
 
-See `tests/TestSpecs/README.md` for detailed format documentation.
+Example:
+```csharp
+[Fact]
+public void MyNewTest()
+{
+    var bridge = new InMemoryTestBridge();
+    var scenario = new TestScenario(bridge);
+    
+    var player = scenario.Player("Hero", health: 100);
+    player.TakeDamage(30).ThenStep();
+    
+    scenario.Assert.Player(player).HasHealth(70);
+}
+```
 
 ## Architecture Decisions
 
-### Why JSON for Test Specs?
-- Human-readable and easy to review
-- Version control friendly
-- Language/platform agnostic
-- Easy to generate programmatically
-- No compilation required
+### Why Fluent API for Test Authoring?
+- **Type-safe** - Compile-time checking, refactoring support
+- **IntelliSense** - Auto-completion in IDE
+- **Readable** - Natural language-like syntax
+- **Debuggable** - Step through test code
+- **Composable** - Reuse test fragments
+- **Cross-platform** - Same code, multiple bridges
 
 ### Why ITestBridge Interface?
 - Enables multiple implementations (memory, browser, native)
