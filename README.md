@@ -23,10 +23,11 @@ A demonstration project showing how to maximize code reuse between native (Strid
 │   │   ├── Vector2D.cs        # 2D vector math
 │   │   └── Testing/           # 🧪 Unified test framework
 │   │       ├── ITestBridge.cs       # Test control interface
+│   │       ├── TestScenario.cs      # Fluent API for test authoring
 │   │       ├── TestSnapshot.cs      # Game state capture
 │   │       ├── TestCommand.cs       # Platform-agnostic commands
-│   │       ├── TestSpec.cs          # Test specification format
-│   │       ├── TestSpecExecutor.cs  # Test executor
+│   │       ├── TestSpec.cs          # JSON test specification (optional)
+│   │       ├── TestSpecExecutor.cs  # JSON test executor (optional)
 │   │       └── InMemoryTestBridge.cs # Reference implementation
 │   ├── Server/                # 🌐 Realtime game server (SignalR)
 │   │   ├── Hubs/GameHub.cs   # SignalR hub for client-server communication
@@ -180,46 +181,70 @@ The project now includes a **unified test framework** that allows writing platfo
 
 **Components:**
 - **ITestBridge** - Common interface for test control across platforms
-- **TestSpec** - JSON-based test specification format
-- **TestSpecExecutor** - Executes test specs against any ITestBridge implementation
+- **TestScenario** - Fluent API for writing readable test scenarios
+- **TestSnapshot** - Platform-agnostic state capture
 - **InMemoryTestBridge** - Reference implementation for testing
-- **TestRunner** - Console application to run test specs
 
-**Example Test Spec** (`tests/TestSpecs/player-movement.json`):
+**Fluent API Example:**
+```csharp
+var scenario = new TestScenario(bridge);
+
+var warrior = scenario.Player("Warrior", x: 0, y: 0, health: 100);
+
+warrior.Move(10, 5).ThenStep();
+scenario.Assert.Player(warrior).HasPosition(10, 5);
+
+warrior.TakeDamage(30).ThenStep();
+scenario.Assert.Player(warrior).HasHealth(70).IsAlive();
+```
+
+**Cross-Platform Testing:**
+```csharp
+// Same test code runs on any platform implementing ITestBridge
+private void TestPlayerMovement(ITestBridge bridge)
+{
+    var scenario = new TestScenario(bridge);
+    var player = scenario.Player("Hero", x: 0, y: 0);
+    player.Move(10, 5).ThenStep();
+    scenario.Assert.Player(player).HasPosition(10, 5);
+}
+
+[Fact] void Test_InMemory() => TestPlayerMovement(new InMemoryTestBridge());
+[Fact] void Test_Browser() => TestPlayerMovement(new BrowserTestBridge());
+[Fact] void Test_Stride() => TestPlayerMovement(new StrideTestBridge());
+```
+
+**Alternative: JSON-Based Tests (also supported):**
 ```json
 {
   "id": "player-movement-test",
-  "name": "Player Movement Test",
-  "description": "Verifies that player movement updates position correctly",
   "setup": {
-    "players": [{"id": "player1", "name": "Test Player", "x": 0, "y": 0, "health": 100}]
+    "players": [{"id": "p1", "x": 0, "y": 0, "health": 100}]
   },
-  "steps": [
-    {
-      "advanceSteps": 1,
-      "command": {"type": "Move", "targetId": "player1", "parameters": {"deltaX": 10, "deltaY": 5}},
-      "assertions": [
-        {"type": "PlayerPositionX", "targetId": "player1", "expected": 10.0}
-      ]
-    }
-  ]
+  "steps": [{
+    "command": {"type": "Move", "targetId": "p1", 
+                "parameters": {"deltaX": 10, "deltaY": 5}},
+    "assertions": [
+      {"type": "PlayerPositionX", "targetId": "p1", "expected": 10.0}
+    ]
+  }]
 }
 ```
 
-**Running Unified Tests:**
+**Running Tests:**
 ```bash
-# Run test specs with the test runner
-dotnet run --project tests/TestRunner/Game.TestRunner.csproj
-
-# Run test framework validation tests
+# Run fluent API tests
 dotnet test tests/TestFrameworkTests/Game.TestFrameworkTests.csproj
+
+# Run JSON-based test specs
+dotnet run --project tests/TestRunner/Game.TestRunner.csproj
 ```
 
-See `tests/TestSpecs/README.md` for detailed documentation on the test specification format.
+See `tests/TestSpecs/FLUENT_API_EXAMPLES.md` for comprehensive examples.
 
 Run tests with:
 ```bash
-# All tests (45 total: 26 unit + 3 integration + 6 server + 7 framework + 3 specs)
+# All tests (51 total: 26 unit + 3 integration + 6 server + 13 framework + 3 JSON specs)
 dotnet test
 
 # Specific test project
