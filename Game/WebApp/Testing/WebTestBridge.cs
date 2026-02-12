@@ -15,6 +15,11 @@ public class WebTestBridge : ITestBridge, IDisposable
     private readonly string? _appUrl;
     private readonly bool _useBrowser;
     
+    // Resources managed by this bridge (when created via CreateTestInstance)
+    private IPlaywright? _playwright;
+    private IBrowser? _browser;
+    private BlazorTestServer? _testServer;
+    
     // Fallback in-memory state for when browser is not available
     private Player? _player;
     private AI? _ai;
@@ -28,12 +33,136 @@ public class WebTestBridge : ITestBridge, IDisposable
     private string? _activeCameraId;
 
     /// <summary>
+    /// Creates a WebTestBridge with full initialization (Playwright + Blazor server).
+    /// This is the recommended way to create a WebTestBridge for testing.
+    /// The bridge manages its own Playwright instance and Blazor test server.
+    /// </summary>
+    public static WebTestBridge CreateTestInstance()
+    {
+        // Find the Blazor project path by looking for the WebApp project relative to common test locations
+        // Try multiple strategies to find the project file
+        string? projectPath = null;
+        
+        // Strategy 1: Look relative to current working directory
+        var currentDir = Directory.GetCurrentDirectory();
+        var pathsToTry = new[]
+        {
+            Path.Combine(currentDir, "Game", "WebApp", "Game.WebApp.csproj"),
+            Path.Combine(currentDir, "..", "Game", "WebApp", "Game.WebApp.csproj"),
+            Path.Combine(currentDir, "..", "..", "Game", "WebApp", "Game.WebApp.csproj"),
+            Path.Combine(currentDir, "..", "..", "..", "Game", "WebApp", "Game.WebApp.csproj"),
+        };
+        
+        foreach (var path in pathsToTry)
+        {
+            var fullPath = Path.GetFullPath(path);
+            if (File.Exists(fullPath))
+            {
+                projectPath = fullPath;
+                break;
+            }
+        }
+        
+        // Strategy 2: Look relative to WebTestBridge assembly location
+        if (projectPath == null)
+        {
+            var bridgeAssembly = typeof(WebTestBridge).Assembly;
+            var bridgeLocation = bridgeAssembly.Location;
+            var bridgeDir = Path.GetDirectoryName(bridgeLocation);
+            
+            // If WebTestBridge is in Game/WebApp/bin/Debug/net8.0/, go up to WebApp folder
+            var webAppDir = Path.GetFullPath(Path.Combine(bridgeDir!, "..", "..", ".."));
+            var candidatePath = Path.Combine(webAppDir, "Game.WebApp.csproj");
+            if (File.Exists(candidatePath))
+            {
+                projectPath = candidatePath;
+            }
+        }
+        
+        // Strategy 3: Look relative to test assembly (if called from tests)
+        if (projectPath == null)
+        {
+            try
+            {
+                var stackTrace = new System.Diagnostics.StackTrace();
+                foreach (var frame in stackTrace.GetFrames())
+                {
+                    var method = frame.GetMethod();
+                    if (method != null)
+                    {
+                        var declaringType = method.DeclaringType;
+                        if (declaringType != null && declaringType != typeof(WebTestBridge))
+                        {
+                            var testAssembly = declaringType.Assembly;
+                            var testLocation = testAssembly.Location;
+                            var testDir = Path.GetDirectoryName(testLocation);
+                            
+                            // Navigate up from test assembly to solution root
+                            // Test assembly is typically at: tests/TestFrameworkTests/bin/Debug/net8.0/Game.TestFrameworkTests.dll
+                            // Need to go up 5 levels to reach solution root
+                            var solutionRoot = Path.GetFullPath(Path.Combine(testDir!, "..", "..", "..", "..", ".."));
+                            var candidatePath = Path.Combine(solutionRoot, "Game", "WebApp", "Game.WebApp.csproj");
+                            if (File.Exists(candidatePath))
+                            {
+                                projectPath = candidatePath;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If stack trace fails, continue to error
+            }
+        }
+        
+        if (projectPath == null || !File.Exists(projectPath))
+        {
+            throw new FileNotFoundException(
+                $"Blazor project not found. Searched in: {string.Join(", ", pathsToTry)}. " +
+                $"Current directory: {currentDir}. " +
+                $"Please ensure Game.WebApp.csproj exists relative to the test execution directory.");
+        }
+        
+        // Create and start Blazor test server
+        var testServer = new BlazorTestServer(projectPath);
+        testServer.StartAsync().GetAwaiter().GetResult();
+        
+        // Initialize Playwright
+        var playwright = Playwright.CreateAsync().GetAwaiter().GetResult();
+        var browser = playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        {
+            Headless = true
+        }).GetAwaiter().GetResult();
+        var page = browser.NewPageAsync().GetAwaiter().GetResult();
+        
+        var appUrl = $"{testServer.BaseUrl}/game?testMode=true";
+        
+        // Create bridge with managed resources
+        var bridge = new WebTestBridge(page, appUrl, playwright, browser, testServer);
+        return bridge;
+    }
+
+    /// <summary>
     /// Creates a WebTestBridge using browser automation (Playwright).
+    /// Use CreateTestInstance() instead for automatic resource management.
     /// </summary>
     public WebTestBridge(IPage page, string appUrl)
+        : this(page, appUrl, null, null, null)
+    {
+    }
+
+    /// <summary>
+    /// Internal constructor that accepts managed resources.
+    /// </summary>
+    private WebTestBridge(IPage page, string appUrl, IPlaywright? playwright, IBrowser? browser, BlazorTestServer? testServer)
     {
         _page = page ?? throw new ArgumentNullException(nameof(page));
         _appUrl = appUrl ?? throw new ArgumentNullException(nameof(appUrl));
+        _playwright = playwright;
+        _browser = browser;
+        _testServer = testServer;
         _useBrowser = true;
         
         // Navigate to app and wait for Blazor to initialize
@@ -446,7 +575,16 @@ public class WebTestBridge : ITestBridge, IDisposable
     
     public void Dispose()
     {
-        // Browser cleanup handled by test code
+        // Dispose managed resources if we own them
+        if (_page != null && _browser != null)
+        {
+            _page.CloseAsync().GetAwaiter().GetResult();
+        }
+        
+        _browser?.CloseAsync().GetAwaiter().GetResult();
+        _playwright?.Dispose();
+        _testServer?.Dispose();
+        
         // In-memory state doesn't need cleanup
     }
 }

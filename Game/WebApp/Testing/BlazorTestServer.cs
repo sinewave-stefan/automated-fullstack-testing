@@ -1,8 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http;
-using System.Text.RegularExpressions;
 
-namespace Game.TestFrameworkTests;
+namespace Game.WebApp.Testing;
 
 /// <summary>
 /// Helper class to launch and manage a Blazor WebAssembly dev server for testing.

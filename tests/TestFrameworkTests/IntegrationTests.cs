@@ -1,7 +1,6 @@
 using Game.Core.Testing;
 using Game.StrideApp.Testing;
 using Game.WebApp.Testing;
-using Microsoft.Playwright;
 using Xunit;
 
 namespace Game.TestFrameworkTests;
@@ -10,38 +9,9 @@ namespace Game.TestFrameworkTests;
 /// Unified integration tests that run against both Stride and Web (Blazor) platforms.
 /// These tests verify that the fluent API works consistently across all platforms.
 /// </summary>
-public class IntegrationTests : IAsyncLifetime, IDisposable
+public class IntegrationTests : IDisposable
 {
-    private IPlaywright? _playwright;
-    private IBrowser? _browser;
-    private IPage? _page;
-    private BlazorTestServer? _testServer;
-    private string? _appUrl;
     private readonly List<IDisposable> _disposables = new();
-
-    public async Task InitializeAsync()
-    {
-        // Initialize Playwright and Blazor test server for Web tests
-        var testAssemblyLocation = typeof(IntegrationTests).Assembly.Location;
-        var testProjectDir = Path.GetDirectoryName(testAssemblyLocation)!;
-        var solutionRoot = Path.GetFullPath(Path.Combine(testProjectDir, "..", "..", "..", "..", ".."));
-        var projectPath = Path.Combine(solutionRoot, "Game", "WebApp", "Game.WebApp.csproj");
-        projectPath = Path.GetFullPath(projectPath);
-        
-        if (File.Exists(projectPath))
-        {
-            _testServer = new BlazorTestServer(projectPath);
-            await _testServer.StartAsync();
-            
-            _playwright = await Playwright.CreateAsync();
-            _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-            {
-                Headless = true
-            });
-            _page = await _browser.NewPageAsync();
-            _appUrl = $"{_testServer.BaseUrl}/game?testMode=true";
-        }
-    }
 
     public static IEnumerable<object[]> TestBridges()
     {
@@ -54,21 +24,9 @@ public class IntegrationTests : IAsyncLifetime, IDisposable
         return platform switch
         {
             "Stride" => StrideTestBridge.CreateTestInstance(),
-            "Web" => CreateWebBridge(),
+            "Web" => WebTestBridge.CreateTestInstance(),
             _ => throw new NotSupportedException($"Platform {platform} is not supported")
         };
-    }
-
-    private ITestBridge CreateWebBridge()
-    {
-        if (_page == null || _appUrl == null)
-        {
-            throw new InvalidOperationException(
-                "Web bridge requires Playwright and Blazor server to be initialized. " +
-                "Ensure InitializeAsync() completed successfully. " +
-                "This may happen if Blazor project file is not found.");
-        }
-        return new WebTestBridge(_page, _appUrl);
     }
 
     [Theory]
@@ -100,15 +58,7 @@ public class IntegrationTests : IAsyncLifetime, IDisposable
         {
             if (bridge is IDisposable disposable)
             {
-                if (platform == "Stride")
-                {
-                    _disposables.Add(disposable);
-                }
-                else
-                {
-                    // Web bridges are disposed immediately (they're per-test)
-                    disposable.Dispose();
-                }
+                _disposables.Add(disposable);
             }
         }
     }
@@ -141,15 +91,7 @@ public class IntegrationTests : IAsyncLifetime, IDisposable
         {
             if (bridge is IDisposable disposable)
             {
-                if (platform == "Stride")
-                {
-                    _disposables.Add(disposable);
-                }
-                else
-                {
-                    // Web bridges are disposed immediately (they're per-test)
-                    disposable.Dispose();
-                }
+                _disposables.Add(disposable);
             }
         }
     }
@@ -189,32 +131,13 @@ public class IntegrationTests : IAsyncLifetime, IDisposable
         }
     }
 
-    public async Task DisposeAsync()
+    public void Dispose()
     {
-        // Dispose all bridges
+        // Dispose all bridges (each bridge manages its own resources)
         foreach (var disposable in _disposables)
         {
             disposable.Dispose();
         }
         _disposables.Clear();
-
-        // Clean up Web resources
-        if (_page != null)
-        {
-            await _page.CloseAsync();
-        }
-        
-        if (_browser != null)
-        {
-            await _browser.CloseAsync();
-        }
-        
-        _playwright?.Dispose();
-        _testServer?.Dispose();
-    }
-
-    public void Dispose()
-    {
-        DisposeAsync().GetAwaiter().GetResult();
     }
 }
