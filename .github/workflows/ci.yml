@@ -19,7 +19,7 @@ jobs:
         dotnet-version: '8.0.x'
     
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore AutomatedFullstackTesting.slnx
     
     - name: Build TestFrameworkTests (generates Playwright install script)
       run: dotnet build tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-restore
@@ -31,7 +31,7 @@ jobs:
       run: dotnet build Game/Core/Game.Core.csproj --configuration Release --no-restore
     
     - name: Build All Projects
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build AutomatedFullstackTesting.slnx --configuration Release --no-restore
     
     - name: Run Unit Tests
       run: dotnet test tests/UnitTests/Game.UnitTests.csproj --configuration Release --no-build --verbosity normal
