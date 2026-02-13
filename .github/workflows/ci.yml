@@ -18,13 +18,14 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
-    - name: Install Playwright
-      run: |
-        dotnet tool install --global Microsoft.Playwright.CLI
-        playwright install --with-deps chromium
-    
     - name: Restore dependencies
       run: dotnet restore
+    
+    - name: Build TestFrameworkTests (generates Playwright install script)
+      run: dotnet build tests/TestFrameworkTests/Game.TestFrameworkTests.csproj --configuration Release --no-restore
+    
+    - name: Install Playwright browsers
+      run: pwsh tests/TestFrameworkTests/bin/Release/net8.0/playwright.ps1 install --with-deps chromium
     
     - name: Build Core Library
       run: dotnet build Game/Core/Game.Core.csproj --configuration Release --no-restore
